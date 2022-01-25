@@ -1,5 +1,5 @@
 ---
-title: "SPIKE analysis"
+title: "Nucleocapsid analysis"
 output: word_document
 ---
 
@@ -22,10 +22,25 @@ library(knitr)
 source(paste0(root, '/R/helper functions.R'))
 
 # input file
-f <- paste0(root, '/data/COVID19_VAL_Spike_Summary_vFinal_Repeats.xlsx')
+f <- paste0(root, '/data/COVID19_VAL_Nucleocapsid_Summary.xlsx')
 
-# for monitoring differences in column names :P
-diff <- list()
+# for monitoring differences in column and sheet names :P
+# default sheet and column names are those provided in the spike data set
+# this compensates for different names in subsequent data sets
+diff <- list(linearity_acon = 'Result (AU/mL)',
+             cutpoint_acon = 'Calculated Result from Titer (AU/mL)',
+             sens_acon = 'Calculated Result (AU/mL)',
+             acc_acon = 'Calculated Result (AU/mL)',
+             prec_sheet = 'Precision',
+             prec_acon = 'Calculated Result (AU/mL)',
+             covr_acon = 'Calculated Result (AU/mL)',
+             freez_acon = 'Calculated Result (AU/mL)',
+             lip_acon = 'Calculated Result (AU/mL)',
+             bili_acon = 'Calculated Result (AU/mL)',
+             hemo_acon = 'Calculated Result (AU/mL)',
+             heat_acon = 'Calculated Result (AU/mL)',
+             conj_acon = 'Calculated Result (AU/mL)',
+             antigen_acon = 'Calculated Result (AU/mL)')
 
 # this is where all tables for the report will be stored
 tables <- list()
@@ -196,6 +211,6 @@ write_xlsx(list(LLOQ = lloq_sum,
                 Lot_to_Lot_Conjugate = conj_sum,
                 Linearity = lin_sum,
                 Specificity = spec_sum),
-           path = 'Spike_Results.xlsx')
+           path = 'Nucleocapsid_Results.xlsx')
 
 ```
