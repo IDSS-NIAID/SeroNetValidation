@@ -58,10 +58,9 @@ pct_err <- function(xbar, e, log_scale = FALSE)
 #' 
 #' @param xbar Numeric. Mean
 #' @param sd Numeric. Standard deviation
-#' @param log_scale Logical. When TRUE, convert xbar and sd to log scale prior to calculation
+#' @param log_scale Logical. When TRUE, convert xbar and sd to ("log") Arithmetic scale prior to calculation
 #' 
-#' @return The relative standard deviation
-rsd <- function(xbar, sd, log_scale = TRUE)
+ rsd <- function(xbar, sd, log_scale = FALSE)
 {
     if(log_scale)
     {

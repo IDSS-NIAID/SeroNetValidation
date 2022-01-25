@@ -1,6 +1,8 @@
 ---
 title: "Nucleocapsid analysis"
-output: word_document
+output:
+  word_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -8,7 +10,7 @@ knitr::opts_chunk$set(echo = FALSE)
 options(dplyr.summarise.inform = FALSE)
 
 # repo root directory
-root <- system('git rev-parse --show-toplevel', intern = TRUE)
+root <- file.path("O:/HSL/HSL_COVID-19/Chunming Zhu")
 
 library(readxl)
 library(dplyr)
@@ -18,11 +20,12 @@ library(tidyr)
 library(writexl)
 
 library(knitr)
+library(magrittr)
 
-source(paste0(root, '/R/helper functions.R'))
+source(paste0(root, '/Data analysis/Rcode/helper functions.R'))
 
 # input file
-f <- paste0(root, '/data/COVID19_VAL_Nucleocapsid_Summary.xlsx')
+f <- paste0(root, '/SARS/COVID19_VAL_Nucleocapsid_Summary.xlsx')
 
 # for monitoring differences in column and sheet names :P
 # default sheet and column names are those provided in the spike data set
@@ -59,7 +62,7 @@ tables$table1 <- tibble(Experiment = c('LLOQ', 'ULOQ', 'Linearity', 'Cutpoint', 
                         Methodology = NA,
                         `Acceptance Criteria` = NA)
 
-source(paste0(root, '/R/processData.R'))
+source(paste0(root, '/Data analysis/Rcode/processData.R'))
 ```
 
 ```{r summary table}
