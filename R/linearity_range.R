@@ -23,7 +23,7 @@ setwd("O:\\HSL\\HSL_COVID-19\\Chunming Zhu\\SARS\\Chunming_result\\trying\\")
 # read i n and process LLOQ data
 
 
-cutpoint <- read.csv("COVID19 neucleocapsid_lin_all729.csv", header=T) #, na = c('', 'Sample did not dilute down properly-can not use data')) # %>%
+cutpoint <- read.csv("COVID19 neucleocapsid_lin_all820.csv", header=T) #, na = c('', 'Sample did not dilute down properly-can not use data')) # %>%
 
 cutpoint$lg_Acon <- log(cutpoint$Acon)
 ####################################
@@ -102,7 +102,7 @@ out <- cbind(coef=summary(model0)$coefficients$fixed ,  anova(model0)[4]) [2,]
  
  d<-NULL
  
- for (i in 5:35) {
+ for (i in 1:35) {
     lo <- i/50
     for (j in 60:180 ) {
        
@@ -120,6 +120,8 @@ out <- cbind(coef=summary(model0)$coefficients$fixed ,  anova(model0)[4]) [2,]
    }
    
  }
+ 
+ final <- d[substr(rownames(d),2,5) != "Inter" & d$p.value >0.05, ]
  write.csv(d,"linearity_plusOQ_random__neucleoIgM.csv")
  
  
