@@ -14,7 +14,7 @@ library(ggplot2)
 
 library(nlme)
 
-setwd("O:\\HSL\\HSL_COVID-19\\Chunming Zhu\\SARS\\Chunming_result\\trying\\")
+setwd("O:\\HSL\\HSL_COVID-19\\Chunming Zhu\\SARS\\ELISA\\Chunming_result\\trying\\")
 
 ############
 # cutpoint #
@@ -23,7 +23,7 @@ setwd("O:\\HSL\\HSL_COVID-19\\Chunming Zhu\\SARS\\Chunming_result\\trying\\")
 # read i n and process LLOQ data
 
 
-cutpoint <- read.csv("COVID19 Spike_lin_all820.csv", header=T) #, na = c('', 'Sample did not dilute down properly-can not use data')) # %>%
+cutpoint <- read.csv("COVID19 Spike_lin_all823.csv", header=T) #, na = c('', 'Sample did not dilute down properly-can not use data')) # %>%
 
 #cutpoint$lg_Acon <- log(cutpoint$Acon)
 ####################################
@@ -42,16 +42,19 @@ out <- cbind(coef=summary(model0)$coefficients$fixed ,  anova(model0)[4]) [2,]
 ### screen cut off range IgG
 #######################################
  
+ 
+ 
+ 
  d<-NULL
 
- for (i in 1:35) {
-    lo <- i/50
-     for (j in 60:180 ) {
+ for (i in -83:-11) {
+    lo <- i/10
+     for (j in -10:43) {
      
-      hi <- j/50
-      data1 <- IgG[lo <= IgG$OD & IgG$OD <= hi, ]
+      hi <- j/10
+      data1 <- IgG[lo <= IgG$lg_OD & IgG$lg_OD <= hi, ]
       
-      model<-  lme(lg_acon ~ OD , random = ~1 |sample_idd, data=data1, na.action = na.omit, method="ML")
+      model<-  lme(lg_acon ~ lg_OD , random = ~1 |sample_idd, data=data1, na.action = na.omit, method="ML")
       df<-cbind(coef=summary(model)$coefficients$fixed ,  anova(model)[4]) 
       data.frame(df) 
       df <- cbind(low_point= lo,df) 
@@ -64,33 +67,17 @@ out <- cbind(coef=summary(model0)$coefficients$fixed ,  anova(model0)[4]) [2,]
  }
  
  final <- d[substr(rownames(d),2,5) != "Inter" & d$p.value >0.05, ]  #0.68--1.86
- write.csv( final,"linearity_plusOQ_random_IgG.csv")
+ 
+final$hi_od <- 4*exp(final$hi_point)/(1 + exp(final$hi_point))
+final$lo_od <- 4*exp(final$low_point)/(1 + exp(final$low_point))
+# final$hi_od <- exp(final$hi_point)
+# final$lo_od <- exp(final$low_point)
+ 
+ write.csv( final,"linearity_plusOQ_random_IgG_log_log.csv")
  
  ##############################################################
  
  
- d<-NULL
- 
- for (i in 1:35) {
-    lo <- i/50
-    for (j in 60:180 ) {
-       
-       hi <- j/50
-       data1 <- IgG[lo <= IgG$OD & IgG$OD <= hi, ]
-       
-       model<-  lme(lg_acon ~ OD , random = ~1 +Analyst|sample_idd, data=data1, na.action = na.omit, method="ML")
-       df<-cbind(coef=summary(model)$coefficients$fixed ,  anova(model)[4]) 
-       data.frame(df) 
-       df <- cbind(low_point= lo,df) 
-       df <-  cbind(hi_point= hi, df)
-       df_ij<- data.frame(df) 
-       d<-rbind(d,df_ij) 
-       
-    }
-    
- }
- final <- d[substr(rownames(d),2,5) != "Inter" & d$p.value >0.05, ]
- write.csv(final ,"linearity_plusOQ_random_slope_IgG.csv")
  
  
  
@@ -102,14 +89,15 @@ out <- cbind(coef=summary(model0)$coefficients$fixed ,  anova(model0)[4]) [2,]
  
  d<-NULL
  
- for (i in 1:35) {
-    lo <- i/50
-    for (j in 60:180 ) {
-       
-       hi <- j/50
-     data1 <- IgM[lo <= IgM$OD & IgM$OD <= hi, ]
+ 
+ for (i in -50:0) {
+   lo <- i/10
+   for (j in 1:14) {
      
-     model<-  lme(lg_acon ~ OD , random = ~1 |sample_idd, data=data1, na.action = na.omit, method="ML")
+     hi <- j/10
+     data1 <- IgM[lo <= IgM$log_OD & IgM$log_OD <= hi, ]
+     
+     model<-  lme(lg_acon ~ log_OD , random = ~1 |sample_idd, data=data1, na.action = na.omit, method="ML")
      df<-cbind(coef=summary(model)$coefficients$fixed ,  anova(model)[4]) 
      data.frame(df) 
      df <- cbind(low_point= lo,df) 
@@ -121,8 +109,14 @@ out <- cbind(coef=summary(model0)$coefficients$fixed ,  anova(model0)[4]) [2,]
    
  }
  
- final <- d[substr(rownames(d),2,5) != "Inter" & d$p.value >0.05, ]
- write.csv(final,"linearity_plus_OQ_random_IgM.csv")
+ final <- d[substr(rownames(d),2,5) != "Inter" & d$p.value >0.05, ]  #0.68--1.86
+ 
+ # final$hi_od <- 4/(1 + exp(final$hi_point))
+ # final$lo_od <- 4/(1 + exp(final$low_point))
+ final$hi_od <- exp(final$hi_point)
+ final$lo_od <- exp(final$low_point)
+ 
+ write.csv(final,"linearity_plus_OQ_random_IgM_log_log.csv")
  
 ############################################################################################# 
  
