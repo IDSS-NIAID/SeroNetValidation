@@ -1,7 +1,9 @@
 ---
-title: "Nucleocapsid analysis"
+title: "SPIKE analysis"
 output:
   word_document: default
+  html_document:
+    df_print: paged
   pdf_document: default
 ---
 
@@ -19,34 +21,18 @@ library(tidyr)
 
 library(writexl)
 
-library(knitr)
-library(magrittr)
-
-source(paste0(root, '/Data analysis/Rcode/helper functions.R'))
-
-# input file
-f <- paste0(root, '/SARS/COVID19_VAL_Nucleocapsid_Summary.xlsx')
-
-# for monitoring differences in column and sheet names :P
-# default sheet and column names are those provided in the spike data set
-# this compensates for different names in subsequent data sets
-diff <- list(linearity_acon = 'Result (AU/mL)',
-             cutpoint_acon = 'Calculated Result from Titer (AU/mL)',
-             sens_acon = 'Calculated Result (AU/mL)',
-             acc_acon = 'Calculated Result (AU/mL)',
-             prec_sheet = 'Precision',
-             prec_acon = 'Calculated Result (AU/mL)',
-             covr_acon = 'Calculated Result (AU/mL)',
-             freez_acon = 'Calculated Result (AU/mL)',
-             lip_acon = 'Calculated Result (AU/mL)',
-             bili_acon = 'Calculated Result (AU/mL)',
-             hemo_acon = 'Calculated Result (AU/mL)',
-             heat_acon = 'Calculated Result (AU/mL)',
-             conj_acon = 'Calculated Result (AU/mL)',
-             antigen_acon = 'Calculated Result (AU/mL)')
+# for monitoring differences in column names :P
+diff <- list()
 
 # this is where all tables for the report will be stored
 tables <- list()
+library(knitr)
+
+source(paste0(root, '/Data analysis/Rcode/helper functions_HPV.R'))
+
+# input file
+f <- paste0(root, '/SARS/COVID19_VAL_Spike_Summary_vFinal Fixed.xlsx')
+
 
 # summary table 1, displaying acceptance criteria and procedures
 # this will be filled out as we read in data from the source Excel file
@@ -214,6 +200,6 @@ write_xlsx(list(LLOQ = lloq_sum,
                 Lot_to_Lot_Conjugate = conj_sum,
                 Linearity = lin_sum,
                 Specificity = spec_sum),
-           path = 'Nucleocapsid_Results.xlsx')
+           path = 'Spike_Results.xlsx')
 
 ```

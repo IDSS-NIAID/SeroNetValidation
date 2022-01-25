@@ -35,14 +35,14 @@ geo_sd <- function(x, ...)
 #' 
 #' @param xbar A numeric value specifying the mean.
 #' @param e A numeric value specifying the expected mean.
-#' @param log_scale Logical. When TRUE, convert xbar and e to log scale prior to calculation
+#' @param log_scale Logical. When TRUE, convert xbar and e to ("log") numeric scale prior to calculation
 #' 
 #' @return The percent error, delta.
 pct_err <- function(xbar, e, log_scale = FALSE)
 {
     if(log_scale)
     {
-        retval <- abs((log(xbar) - log(e)) / log(e)) * 100
+        retval <- abs((exp(xbar) - exp(e)) / exp(e)) * 100    ###previously, it double logged by using "log" , I change it to "exp" #####
     }else{
         retval <- abs((xbar - e) / e) * 100
     }
@@ -58,13 +58,14 @@ pct_err <- function(xbar, e, log_scale = FALSE)
 #' 
 #' @param xbar Numeric. Mean
 #' @param sd Numeric. Standard deviation
-#' @param log_scale Logical. When TRUE, convert xbar and sd to ("log") Arithmetic scale prior to calculation
+#' @param log_scale Logical. When TRUE, convert xbar and sd to ("log") Numeric scale prior to calculation
 #' 
- rsd <- function(xbar, sd, log_scale = FALSE)
+#' @return The relative standard deviation
+rsd <- function(xbar, sd, log_scale = FALSE)
 {
     if(log_scale)
     {
-        retval <- 100 * log(sd) / log(xbar)
+        retval <- 100 * exp(sd) / exp(xbar)   ###previously, it double logged by using "log" , I change it to "exp" #####
     }else{
         retval <- 100 * sd / xbar
     }
@@ -109,40 +110,41 @@ get_summary_table1 <- function(tables, test_name, stats, minmax, which.minmax, p
 {
     # summary table by sample ID and assay
     # filter by acceptance criteria
+        
+    stats<-lloq_sum
+    
     igg <- filter(stats, delta <= 50 & rsd <= 30 & grepl('IgG', Assay)) %>%
         
         # calculate min/max concentration that passed - grouped by sample ID and analyst
-        group_by(Sample_ID, Assay, Analyst) %>%
+        group_by(Sample_ID, Assay) %>%  # , Analyst
         summarize(statxbar = minmax(xbar, na.rm = TRUE),
                   dilFact = Dil_Factor[which.minmax(xbar)]) %>%
-        ungroup() %>%
+        ungroup() # %>%
         
         # drop Analsyt initials and convert to 1/2
-        mutate(tmp = factor(Analyst),
-               Analyst = as.numeric(tmp)) %>%
-        select(-tmp)
+        #  mutate(tmp = factor(Analyst),
+        #         Analyst = as.numeric(tmp)) %>%
+        #  select(-tmp)
     
     igm <- filter(stats, delta <= 50 & rsd <= 30 & grepl('IgM', Assay)) %>%
         
         # calculate min/max concentration that passed - grouped by sample ID and analyst
-        group_by(Sample_ID, Assay, Analyst) %>%
+        group_by(Sample_ID, Assay) %>%
         summarize(statxbar = minmax(xbar, na.rm = TRUE),
                   dilFact = Dil_Factor[which.minmax(xbar)]) %>%
-        ungroup() %>%
+        ungroup() # %>%
         
         # drop Analsyt initials and convert to 1/2
-        mutate(tmp = factor(Analyst),
-               Analyst = as.numeric(tmp)) %>%
-        select(-tmp)
+        # mutate(tmp = factor(Analyst),
+        #        Analyst = as.numeric(tmp)) %>%
+        #   select(-tmp)
     
     
     tables[[test_name]] <- 
         bind_rows(pivot_wider(igg, id_cols = c(Sample_ID, Assay),
-                              names_from = Analyst, values_from = statxbar,
-                              names_prefix = 'Analyst '), 
+                              values_from = statxbar),
                   pivot_wider(igm, id_cols = c(Sample_ID, Assay), 
-                              names_from = Analyst, values_from = statxbar,
-                              names_prefix = 'Analyst '))
+                              values_from = statxbar))
     
     tables[[paste0(test_name, '_sum')]] <- 
         tibble(Measure = c('Mean_g', 'Median', 'SD_g', 'Min', 'Max', 
