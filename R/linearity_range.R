@@ -23,9 +23,9 @@ setwd("O:\\HSL\\HSL_COVID-19\\Chunming Zhu\\SARS\\Chunming_result\\trying\\")
 # read i n and process LLOQ data
 
 
-cutpoint <- read.csv("COVID19 Spike_lin_all729.csv", header=T) #, na = c('', 'Sample did not dilute down properly-can not use data')) # %>%
+cutpoint <- read.csv("COVID19 Spike_lin_all820.csv", header=T) #, na = c('', 'Sample did not dilute down properly-can not use data')) # %>%
 
-cutpoint$lg_Acon <- log(cutpoint$Acon)
+#cutpoint$lg_Acon <- log(cutpoint$Acon)
 ####################################
 ### try ###
 
