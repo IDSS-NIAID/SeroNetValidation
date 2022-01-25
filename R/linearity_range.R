@@ -14,7 +14,8 @@ library(ggplot2)
 
 library(nlme)
 
-setwd("O:\\HSL\\HSL_COVID-19\\Chunming Zhu\\SARS\\ELISA\\Chunming_result\\trying\\")
+setwd("O:\\HSL\\HSL_COVID-19\\Chunming Zhu\\SARS\\ELISA\\Chunming_result_28Sep21\\spike_sep21\\")
+
 
 ############
 # cutpoint #
@@ -23,17 +24,21 @@ setwd("O:\\HSL\\HSL_COVID-19\\Chunming Zhu\\SARS\\ELISA\\Chunming_result\\trying
 # read i n and process LLOQ data
 
 
-cutpoint <- read.csv("COVID19 Spike_lin_all823.csv", header=T) #, na = c('', 'Sample did not dilute down properly-can not use data')) # %>%
+cutpoint <- read.csv("spike_all_linear.csv", header=T) #, na = c('', 'Sample did not dilute down properly-can not use data')) # %>%
 
-#cutpoint$lg_Acon <- log(cutpoint$Acon)
+cutpoint$lg_Acon <- log(cutpoint$Acon)
 ####################################
 ### try ###
 
 IgG <- cutpoint[cutpoint$Assay=="Spike IgG",]
 IgM <- cutpoint[cutpoint$Assay=="Spike IgM",]
 
+
+
+
+
 data1 <- IgG[lo <= IgG$OD & IgG$OD <= hi, ]
-model0<- lme(lg_acon ~ OD , random = ~1 |SID, data=data1, na.action = na.omit)
+model0<- lme(lg_Acon ~ OD , random = ~1 |SID, data=data1, na.action = na.omit)
 out <- cbind(coef=summary(model0)$coefficients$fixed ,  anova(model0)[4]) [2,] 
  out$low_point <-lo
  out$hi_point<-hi
@@ -42,19 +47,16 @@ out <- cbind(coef=summary(model0)$coefficients$fixed ,  anova(model0)[4]) [2,]
 ### screen cut off range IgG
 #######################################
  
- 
- 
- 
  d<-NULL
 
- for (i in -83:-11) {
-    lo <- i/10
-     for (j in -10:43) {
+ for (i in 1:14) {
+    lo <- i/20
+     for (j in 12:38 ) {
      
       hi <- j/10
-      data1 <- IgG[lo <= IgG$lg_OD & IgG$lg_OD <= hi, ]
+      data1 <- IgG[lo <= IgG$OD & IgG$OD <= hi, ]
       
-      model<-  lme(lg_acon ~ lg_OD , random = ~1 |sample_idd, data=data1, na.action = na.omit, method="ML")
+      model<-  lme(lg_acon ~ lg_OD , random = ~1 |SID, data=data1, na.action = na.omit, method="ML")
       df<-cbind(coef=summary(model)$coefficients$fixed ,  anova(model)[4]) 
       data.frame(df) 
       df <- cbind(low_point= lo,df) 
@@ -65,19 +67,12 @@ out <- cbind(coef=summary(model0)$coefficients$fixed ,  anova(model0)[4]) [2,]
     }
    
  }
+ final_igg <- d[substr(rownames(d),2,5) != "Inter" & d$p.value >0.05, ]  #0.05--2.1
  
- final <- d[substr(rownames(d),2,5) != "Inter" & d$p.value >0.05, ]  #0.68--1.86
+ final$hi_od <- 4*exp(final$hi_point)/(1 + exp(final$hi_point))
+ final$lo_od <- 4*exp(final$low_point)/(1 + exp(final$low_point))
  
-final$hi_od <- 4*exp(final$hi_point)/(1 + exp(final$hi_point))
-final$lo_od <- 4*exp(final$low_point)/(1 + exp(final$low_point))
-# final$hi_od <- exp(final$hi_point)
-# final$lo_od <- exp(final$low_point)
- 
- write.csv( final,"linearity_plusOQ_random_IgG_log_log.csv")
- 
- ##############################################################
- 
- 
+ write.csv(d,"linearity_random_IgG.csv")
  
  
  
@@ -89,47 +84,14 @@ final$lo_od <- 4*exp(final$low_point)/(1 + exp(final$low_point))
  
  d<-NULL
  
- 
- for (i in -50:0) {
-   lo <- i/10
-   for (j in 1:14) {
+ for (i in 1:14) {
+   lo <- i/20
+   for (j in 12:38 ) {
      
      hi <- j/10
-     data1 <- IgM[lo <= IgM$log_OD & IgM$log_OD <= hi, ]
-     
-     model<-  lme(lg_acon ~ log_OD , random = ~1 |sample_idd, data=data1, na.action = na.omit, method="ML")
-     df<-cbind(coef=summary(model)$coefficients$fixed ,  anova(model)[4]) 
-     data.frame(df) 
-     df <- cbind(low_point= lo,df) 
-     df <-  cbind(hi_point= hi, df)
-     df_ij<- data.frame(df) 
-     d<-rbind(d,df_ij) 
-     
-   }
-   
- }
- 
- final <- d[substr(rownames(d),2,5) != "Inter" & d$p.value >0.05, ]  #0.68--1.86
- 
- # final$hi_od <- 4/(1 + exp(final$hi_point))
- # final$lo_od <- 4/(1 + exp(final$low_point))
- final$hi_od <- exp(final$hi_point)
- final$lo_od <- exp(final$low_point)
- 
- write.csv(final,"linearity_plus_OQ_random_IgM_log_log.csv")
- 
-############################################################################################# 
- 
- d<-NULL
- 
- for (i in 1:35) {
-   lo <- i/50
-   for (j in 60:180 ) {
-     
-     hi <- j/50
      data1 <- IgM[lo <= IgM$OD & IgM$OD <= hi, ]
      
-     model<-  lme(lg_acon ~ OD , random = ~1 + Analyst |sample_idd, data=data1, na.action = na.omit, method="ML")
+     model<-  lme(lg_acon ~ lg_OD , random = ~1 |SID, data=data1, na.action = na.omit, method="ML")
      df<-cbind(coef=summary(model)$coefficients$fixed ,  anova(model)[4]) 
      data.frame(df) 
      df <- cbind(low_point= lo,df) 
@@ -141,44 +103,54 @@ final$lo_od <- 4*exp(final$low_point)/(1 + exp(final$low_point))
    
  }
  
- final <- d[substr(rownames(d),2,5) != "Inter" & d$p.value >0.05, ]
- write.csv(final,"linearity_plus_OQ_random_slope_IgM.csv")
+ final_igM <- d[substr(rownames(d),2,5) != "Inter" & d$p.value >0.05, ]  #0.05--2.1
+ 
+ final$hi_od <- 4*exp(final$hi_point)/(1 + exp(final$hi_point))
+ final$lo_od <- 4*exp(final$low_point)/(1 + exp(final$low_point))
+ write.csv(d,"linearity_random_IgM.csv")
  
  
  ###################################################################################
  ############# plot the fitted model ##############################################
  ##################################################################################
  
- 
- lo <- 0.68
- hi <- 1.86
- data1 <- cutpoint[lo <= cutpoint$bg_OD & cutpoint$bg_OD <= hi, ]
- 
- model<- lme(AIC.5pf ~ bg_OD , random = ~ 1 |SID, data=data1)
- df<-cbind(coef=summary(model)$coefficients$fixed ,  anova(model)[4]) 
- data.frame(df) 
- df <- cbind(low_point= lo,df) 
- df <-  cbind(hi_point= hi, df)
- data.frame(df)  
- 
- 
- data1$fit <- predict(model) 
- 
- summary(model)
- 
- 
-##### plot the points
-  ggplot(data=data1, aes(x=bg_OD, y=AIC.5pf , color=SID)) + geom_point( alpha = 0.9) +
+ IgG  %>% ggplot(aes(x=lg_OD, y = Result)) + 
+    geom_point(alpha=0.1) + geom_smooth(method='lm') +
+    xlab('Log_OD') +
+    scale_y_log10() +
+    
+    ylab('Titer(AU/mL)')   +  
+    theme_bw()+
+   scale_x_continuous(breaks = seq(-7, 5, 1.0)) +
+    theme(legend.position  = 'bottom',legend.title = element_blank()) 
 
-### fitted regression lines for each SID    
- geom_line(aes(y=fit,   color=SID),lwd=1) +    
-  
-#####Combined fitted line          
- geom_abline(intercept = 3.540365, slope = 0.098693,  lwd = 1.5, color="black") 
  
-
-   
  
-
+ IgM %>% filter(lg_OD < 5) %>% ggplot(aes(x=lg_OD, y = Result)) + 
+    geom_point(alpha=0.1) + geom_smooth(method='lm') +
+    xlab('Log_OD') +
+    scale_y_log10() +
+    ylab('Titer(AU/mL)')   +  
+    scale_x_continuous(breaks = seq(-7, 5, 1.0)) +
+    theme_bw()+
+    theme(legend.position  = 'bottom',legend.title = element_blank()) 
+ 
+ 
+ ###################################################################################
+ ############# plot the stability data ###########################################
+ ##################################################################################
+   freeze <-read.csv("stability_freeze.csv", header=T)  
+ freeze$Treatment =  factor(freeze$Treatment, levels= c("1X", "5X","10X"))
+ 
+ 
+ freeze %>% ggplot(aes(x=Treatment, y = geomean,group=Sample_ID)) + 
+    geom_line(aes(colour=Sample_ID), lwd=1) +
+    xlab('Treatment : Freeze and Thraw times') +
+    scale_y_log10() +
+    facet_wrap(~Assay) +
+    ylab('Titer (AU/mL)')   +  
+       theme_bw()+
+    theme(legend.position  = 'null',legend.title = element_blank()) 
+ 
  
   
