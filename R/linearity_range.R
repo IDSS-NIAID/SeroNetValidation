@@ -14,7 +14,7 @@ library(ggplot2)
 
 library(nlme)
 
-setwd("O:\\HSL\\HSL_COVID-19\\Chunming Zhu\\SARS\\Chunming_result\\")
+setwd("O:\\HSL\\HSL_COVID-19\\Chunming Zhu\\SARS\\Chunming_result\\trying\\")
 
 ############
 # cutpoint #
@@ -23,7 +23,7 @@ setwd("O:\\HSL\\HSL_COVID-19\\Chunming Zhu\\SARS\\Chunming_result\\")
 # read i n and process LLOQ data
 
 
-cutpoint <- read.csv("COVID19 Spike_lin.csv", header=T) #, na = c('', 'Sample did not dilute down properly-can not use data')) # %>%
+cutpoint <- read.csv("COVID19 Spike_lin_all729.csv", header=T) #, na = c('', 'Sample did not dilute down properly-can not use data')) # %>%
 
 cutpoint$lg_Acon <- log(cutpoint$Acon)
 ####################################
@@ -33,7 +33,7 @@ IgG <- cutpoint[cutpoint$Assay=="Spike IgG",]
 IgM <- cutpoint[cutpoint$Assay=="Spike IgM",]
 
 data1 <- IgG[lo <= IgG$OD & IgG$OD <= hi, ]
-model0<- lme(lg_Acon ~ OD , random = ~1 |SID, data=data1, na.action = na.omit)
+model0<- lme(lg_acon ~ OD , random = ~1 |SID, data=data1, na.action = na.omit)
 out <- cbind(coef=summary(model0)$coefficients$fixed ,  anova(model0)[4]) [2,] 
  out$low_point <-lo
  out$hi_point<-hi
@@ -44,14 +44,14 @@ out <- cbind(coef=summary(model0)$coefficients$fixed ,  anova(model0)[4]) [2,]
  
  d<-NULL
 
- for (i in 1:7) {
-    lo <- i/10
-     for (j in 12:38 ) {
+ for (i in 1:35) {
+    lo <- i/50
+     for (j in 60:180 ) {
      
-      hi <- j/10
+      hi <- j/50
       data1 <- IgG[lo <= IgG$OD & IgG$OD <= hi, ]
       
-      model<-  lme(lg_Acon ~ OD , random = ~1 |SID, data=data1, na.action = na.omit, method="ML")
+      model<-  lme(lg_acon ~ OD , random = ~1 |sample_idd, data=data1, na.action = na.omit, method="ML")
       df<-cbind(coef=summary(model)$coefficients$fixed ,  anova(model)[4]) 
       data.frame(df) 
       df <- cbind(low_point= lo,df) 
@@ -62,7 +62,36 @@ out <- cbind(coef=summary(model0)$coefficients$fixed ,  anova(model0)[4]) [2,]
     }
    
  }
- write.csv(d,"linearity_random_IgG.csv")
+ 
+ final <- d[substr(rownames(d),2,5) != "Inter" & d$p.value >0.05, ]  #0.68--1.86
+ write.csv( final,"linearity_plusOQ_random_IgG.csv")
+ 
+ ##############################################################
+ 
+ 
+ d<-NULL
+ 
+ for (i in 1:35) {
+    lo <- i/50
+    for (j in 60:180 ) {
+       
+       hi <- j/50
+       data1 <- IgG[lo <= IgG$OD & IgG$OD <= hi, ]
+       
+       model<-  lme(lg_acon ~ OD , random = ~1 +Analyst|sample_idd, data=data1, na.action = na.omit, method="ML")
+       df<-cbind(coef=summary(model)$coefficients$fixed ,  anova(model)[4]) 
+       data.frame(df) 
+       df <- cbind(low_point= lo,df) 
+       df <-  cbind(hi_point= hi, df)
+       df_ij<- data.frame(df) 
+       d<-rbind(d,df_ij) 
+       
+    }
+    
+ }
+ final <- d[substr(rownames(d),2,5) != "Inter" & d$p.value >0.05, ]
+ write.csv(final ,"linearity_plusOQ_random_slope_IgG.csv")
+ 
  
  
  ####################################################################################
@@ -73,14 +102,14 @@ out <- cbind(coef=summary(model0)$coefficients$fixed ,  anova(model0)[4]) [2,]
  
  d<-NULL
  
- for (i in 1:7) {
-   lo <- i/10
-   for (j in 12:38 ) {
-     
-     hi <- j/10
+ for (i in 1:35) {
+    lo <- i/50
+    for (j in 60:180 ) {
+       
+       hi <- j/50
      data1 <- IgM[lo <= IgM$OD & IgM$OD <= hi, ]
      
-     model<-  lme(lg_Acon ~ OD , random = ~1 |SID, data=data1, na.action = na.omit, method="ML")
+     model<-  lme(lg_acon ~ OD , random = ~1 |sample_idd, data=data1, na.action = na.omit, method="ML")
      df<-cbind(coef=summary(model)$coefficients$fixed ,  anova(model)[4]) 
      data.frame(df) 
      df <- cbind(low_point= lo,df) 
@@ -91,7 +120,35 @@ out <- cbind(coef=summary(model0)$coefficients$fixed ,  anova(model0)[4]) [2,]
    }
    
  }
- write.csv(d,"linearity_random_IgM.csv")
+ 
+ final <- d[substr(rownames(d),2,5) != "Inter" & d$p.value >0.05, ]
+ write.csv(final,"linearity_plus_OQ_random_IgM.csv")
+ 
+############################################################################################# 
+ 
+ d<-NULL
+ 
+ for (i in 1:35) {
+   lo <- i/50
+   for (j in 60:180 ) {
+     
+     hi <- j/50
+     data1 <- IgM[lo <= IgM$OD & IgM$OD <= hi, ]
+     
+     model<-  lme(lg_acon ~ OD , random = ~1 + Analyst |sample_idd, data=data1, na.action = na.omit, method="ML")
+     df<-cbind(coef=summary(model)$coefficients$fixed ,  anova(model)[4]) 
+     data.frame(df) 
+     df <- cbind(low_point= lo,df) 
+     df <-  cbind(hi_point= hi, df)
+     df_ij<- data.frame(df) 
+     d<-rbind(d,df_ij) 
+     
+   }
+   
+ }
+ 
+ final <- d[substr(rownames(d),2,5) != "Inter" & d$p.value >0.05, ]
+ write.csv(final,"linearity_plus_OQ_random_slope_IgM.csv")
  
  
  ###################################################################################
@@ -99,8 +156,8 @@ out <- cbind(coef=summary(model0)$coefficients$fixed ,  anova(model0)[4]) [2,]
  ##################################################################################
  
  
- lo <- 0.5
- hi <- 2.2
+ lo <- 0.68
+ hi <- 1.86
  data1 <- cutpoint[lo <= cutpoint$bg_OD & cutpoint$bg_OD <= hi, ]
  
  model<- lme(AIC.5pf ~ bg_OD , random = ~ 1 |SID, data=data1)
