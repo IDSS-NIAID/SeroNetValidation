@@ -1,0 +1,7 @@
+.Rproj*
+*.Rproj
+*.Rhistory
+
+*.xlsx
+
+.DS_Store

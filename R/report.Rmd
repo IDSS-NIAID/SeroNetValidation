@@ -1,0 +1,201 @@
+---
+title: "SPIKE analysis"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+options(dplyr.summarise.inform = FALSE)
+
+# repo root directory
+root <- system('git rev-parse --show-toplevel', intern = TRUE)
+
+library(readxl)
+library(dplyr)
+library(purrr)
+library(tidyr)
+
+library(writexl)
+
+library(knitr)
+
+source(paste0(root, '/R/helper functions.R'))
+
+# input file
+f <- paste0(root, '/data/COVID19_VAL_Spike_Summary_vFinal_Repeats.xlsx')
+
+# for monitoring differences in column names :P
+diff <- list()
+
+# this is where all tables for the report will be stored
+tables <- list()
+
+# summary table 1, displaying acceptance criteria and procedures
+# this will be filled out as we read in data from the source Excel file
+tables$table1 <- tibble(Experiment = c('LLOQ', 'ULOQ', 'Linearity', 'Cutpoint', 'Sensitivity (LLOQ Challenge)',
+                                'Accuracy', 'Precision', 'Specificity', 'Carry-over', 
+                                'Stability (Freeze/Thaw, Matrix Components, Sample Integrity)',
+                                'Stability (Critical Reagent Lot Change)'),
+                        #Antigen = NA,
+                        `Samples (n)` = NA,
+                        Replicates = NA,
+                        `Analyst(s)` = NA,
+                        `Days (Runs)` = NA,
+                        Methodology = NA,
+                        `Acceptance Criteria` = NA)
+
+source(paste0(root, '/R/processData.R'))
+```
+
+```{r summary table}
+tables$table1 %>%
+    kable(caption = 'Table 1: Spike antigen analysis summary')
+```
+
+
+## Lower limit of quantitation (LLOQ)
+
+The lowest reportable concentration of each analyte in the multiplex assay that passes established criteria.
+
+```{r lloq table}
+tables$lloq %>%
+    kable(digits = 3, caption = paste0('Table ', which(names(tables) == 'lloq'), ': The lowest concentration for each sample, assay and analyst, based on the Percent Error ≤ 50% and within Dilution CV (replicates) ≤ 30%. The concentration units are represented as Arbitrary Units (AU)/mL.'))
+```
+
+```{r lloq stats table}
+tables$lloq_sum %>%
+    kable(digits = 3, caption = paste0('Table ', which(names(tables) == 'lloq_sum'), ': Statistics describing LLOQ statistics for each assay. The concentration units are represented as Arbitrary Units (AU)/mL.'))
+```
+
+
+## ULOQ (Upper limit of quantitation)
+
+The highest reportable concentration of each analte in the multiplex assay that passes established criteria.
+
+```{r uloq table}
+tables$uloq %>%
+    kable(digits = 3, caption = paste0('Table ', which(names(tables) == 'uloq'), ': The highest concentration for each sample, assay and analyst, based on the Percent Error ≤ 50% and within Dilution CV (replicates) ≤ 30%. The concentration units are represented as Arbitrary Units (AU)/mL.'))
+```
+
+```{r uloq stats table}
+tables$uloq_sum %>%
+    kable(digits = 3, caption = paste0('Table ', which(names(tables) == 'uloq_sum'), ': Statistics describing ULOQ statistics for each assay. The concentration units are represented as Arbitrary Units (AU)/mL.'))
+```
+
+
+## Linearity
+
+Linearity demonstrates that the analyte of interest, when present in concentrations exceeding the range of quantification (above ULOQ), can be accurately measured by the assay after dilution to bring the analyte concentrations into the validated range for analysis.
+
+```{r linearity table}
+tables$lin %>%
+    kable(digits = c(NA, 0, 0, 3, 3), caption = paste0('Table ', which(names(tables) == 'lin'), ': Linearity statistics for each Assay, including: minimum and maximum number of replicates passing acceptance criteria (Percent Error ≤ 50% and CV ≤ 30%), and minimum and maximum correlation coefficients.'))
+```
+
+## Cutpoint
+
+Cutpoint examines the levels of analyte in reported naïve COVID (unvaccinated and presumably unexposed to COVID) subjects to establish a population-based lower limit of quantitation based on established criteria.
+
+```{r cutpoint table}
+tables$cutpt %>%
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'cutpt'), ': 95th percentile of the distribution of COVID naïve samples.'))
+```
+
+## Sensitivity
+
+Sensitivity - evaluates and challenges the LLOQ value for each analyte.
+
+```{r sensitivity table}
+tables$sens %>%
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'spec'), ': Sensitivity data. Using the criteria that the lowest concentration for each sample was based on the Percent Error ≤50% and Within Dilution CV (replicates) ≤30%.'))
+```
+
+## Accuracy and Precision
+
+Accuracy and Precision evaluate the closeness of agreement between the true value and experimental value of a sample (Accuracy) and the degree of variability of a series of measurements of a homogeneous sample (Precision).
+
+```{r accuracy table}
+tables$acc %>%
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'acc'), ': Percent Error and RSD for each sample. ACC_L1 sample was defined as the true value. Percent Error ≤ 25% threshold was used to define at which concentrations the assay may be deemed accurate.'))
+```
+
+```{r precision table}
+tables$prec %>%
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'prec'), ': Intra/Inter-Day and Inter-Analyst precision. Percent Error ≤ 25% threshold was used to define at which concentrations the assay may be deemed accurate.'))
+```
+
+## Specificity
+
+Specificity evaluate the ability of the ligand binding assay to measure and analyte in the presence of exogenous and/or endogenous proteins.
+
+```{r specificity table}
+tables$spec %>%
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'spec'), ': Specificity.'))
+```
+
+## Carry-over
+
+Carry-over evaluates the presence of an analyte in a blank sample from a previously analyzed sample with a high concentration of the analyte. This process will detect false positive responses due to errors by the analyst and/or instrument analysis.
+
+```{r caryover table}
+tables$covr %>%
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'covr'), ': Carry-over results for spike assay. The assay Carry-over passed if the percent error ≤25% (replicates) for both samples, and the negative sample is ≤LLOQ.'))
+```
+
+## Stability
+
+Robustness (Freeze/Thaw, Matrix Components, Lot Change) - evaluate the ability of the starting material (analyte) to remain intact when subjected to various storage/use conditions and presence of various matrix components.
+
+```{r freeze thaw stability table}
+tables$freez %>%
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'freez'), ': Freeze/Thaw results. Passed if the Percent Error ≤25% (1X Freeze/thaw aliquot is the reference).'))
+```
+
+```{r matrix stability table}
+tables$matrx %>%
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'matrx'), ': Matrix Components results. Passed if the Percent Error ≤25%. The aliquot without matrix is defined as the reference.'))
+```
+
+Sample Integrity (Heat Treatment) - passed if the Percent Error ≤25%. The aliquot not subjected to heat treatment is defined as the reference. Table 13 describes the Heat results of the HPV9-MIA for each HPV type.
+
+```{r heat stability table}
+tables$heat %>%
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'heat'), ': Sample Integrity (Heat Treatment). Passed if the Percent Error ≤25%. The aliquot not subjected to heat treatment is defined as the reference.'))
+```
+
+
+## Lot-to-Lot Comparisons
+
+
+```{r Lot-to-Lot table}
+tables$l2l %>%
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'l2l'), ': Critical Reagent Lot Change. Passed if the Percent Error ≤25%. Lot A is defined as the reference. The total number of seropositive results with a Percent Error ≤25% is shown. The Lot passes if 80% of the seropositive samples (ex., 26 of the 32) have a Percent Error ≤25%. All samples below the LLOQ were excluded from analysis.'))
+```
+
+
+```{r export raw tables}
+##########################################################
+# This is where we export the raw tables we've generated #
+##########################################################
+
+write_xlsx(list(LLOQ = lloq_sum,
+                ULOQ = uloq_sum,
+                Cutpoint = cutpt,
+                Precision_by_day = prec_by_day,
+                Precision_by_analyst = prec_by_analyst,
+                Accuracy_by_day = acc_by_day,
+                Accuracy_by_analyst = acc_by_analyst,
+                Sensitivity = sens_sum,
+                Caryover = covr_sum,
+                Stability_Freez = freez_sum,
+                Stability_Lipemia = lip_sum,
+                Stability_Bilirubin = bili_sum,
+                Stability_Hemolysis = hemo_sum,
+                Stability_Heat = heat_sum,
+                Lot_to_Lot_Antigen = antigen_sum,
+                Lot_to_Lot_Conjugate = conj_sum,
+                Linearity = lin_sum,
+                Specificity = spec_sum),
+           path = 'Spike_Results.xlsx')
+
+```
