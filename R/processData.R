@@ -8,7 +8,7 @@
 
 # read in and process LLOQ data
 lloq <- read_excel(f, sheet = 'LLOQ', na = c('', 'Sample did not dilute down properly-can not use data')) %>%
-    rename(acon = `Result (Calculated Con.)`) %>%
+    rename(acon = `ACon (AU/mL)`) %>%
     
     # flag out-of-range values
     mutate(range = acon == 'Range?',
@@ -30,7 +30,7 @@ lloq <- read_excel(f, sheet = 'LLOQ', na = c('', 'Sample did not dilute down pro
     filter(!range) %>%
     
     # base concentration
-    group_by(Sample_ID, Day, Analyst) %>%
+    group_by(Assay,Sample_ID) %>%
     mutate(min_dil_factor = min(Dil_Factor),
            base_con = geo_mean(acon[Dil_Factor == min(Dil_Factor)])) %>%
     ungroup()
@@ -44,20 +44,21 @@ tables <- summary_table_update(tables, lloq, 'LLOQ',
 dilution_factor <- 50
 
 # calculate statistics for each group
-lloq_sum <- group_by(lloq, Assay, Sample_ID, Day, Analyst, Dil_Factor) %>%
+lloq_sum <- group_by(lloq, Assay, Sample_ID,  Dil_Factor) %>%   #Day, Analyst,
     
     # theoretical concentration
-    summarize(theo_con = unique(base_con * min_dil_factor / Dil_Factor), # just need one per group
+    summarize(theo_con = unique(base_con),## * min_dil_factor / Dil_Factor), # just need one per group
               
               # mean
               xbar = geo_mean(acon),
-              std = geo_sd(acon),
+              std = sd(acon[is.finite(acon)]),
+              xbar1=mean(acon[is.finite(acon)]),
               
               # delta (% error)    
               delta = pct_err(xbar, theo_con),
               
               # Relative Standard Deviation
-              rsd = rsd(xbar, std)) %>%
+              rsd = rsd(xbar1, std)) %>%
     
     ungroup()
 
@@ -113,20 +114,21 @@ tables <- summary_table_update(tables, uloq, 'ULOQ',
 #dilution_factor <- 36450
 
 # calculate statistics for each group
-uloq_sum <- group_by(uloq, Assay, Sample_ID, Day, Analyst, Dil_Factor) %>%
+uloq_sum <- group_by(uloq, Assay, Sample_ID, Day, Analyst, Dil_Factor) %>%  #Day, Analyst, 
     
     # theoretical concentration
-    summarize(theo_con = unique(base_con * base_dil / Dil_Factor), # just need one per group
+    summarize(theo_con = unique(base_con ), #* base_dil / Dil_Factor), # just need one per group
               
               # mean
               xbar = geo_mean(acon),
-              std = geo_sd(acon),
+              xbar1 =mean(acon[is.finite(acon)]),
+              std = sd(acon[is.finite(acon)]),
               
               # delta (% error)    
               delta = pct_err(xbar, theo_con),
               
               # Relative Standard Deviation
-              rsd = rsd(xbar, std)) %>%
+              rsd = rsd(xbar1, std)) %>%
     
     ungroup()
 
@@ -186,13 +188,14 @@ lin_sum <- group_by(lin, Assay, Sample_ID, Day, Analyst, Dil_Factor) %>%
               
               # geometric mean
               xbar = geo_mean(acon),
-              std = geo_sd(acon),
+              std = sd(acon[is.finite(acon)]),
+              xbar1=mean(acon[is.finite(acon)]),
               
               # delta (% error)    
               delta = pct_err(xbar, theo_con),
               
               # Relative Standard Deviation
-              rsd = rsd(xbar, std)) %>%
+              rsd = rsd(xbar1, std)) %>%
     
     ungroup()
 
@@ -226,7 +229,7 @@ cutpt_sum <- group_by(cutpt, Assay, Sample_ID) %>%
     summarize(n = sum(!is.na(acon)),
               xbar = geo_mean(acon, na.rm = TRUE),
               std = geo_sd(acon, na.rm = TRUE),
-              pctl_95 = exp(qnorm(0.95, log(xbar), log(std)))) %>%
+               pctl_95 = exp(qnorm(0.95, log(xbar), log(std)))) %>%
     ungroup()
 
 tables$cutpt <- group_by(cutpt, Assay) %>%
@@ -260,9 +263,16 @@ sens_sum <- group_by(sens, Assay) %>%
     group_by(Assay, Sample_ID) %>%
     summarize(theo_con = unique(base_con / Dil_Factor),
               xbar = geo_mean(acon, na.rm = TRUE),
-              std = geo_sd(acon, na.rm = TRUE),
-              rsd = rsd(xbar, std),
-              delta = pct_err(xbar, theo_con)) %>%
+            std = sd(acon[is.finite(acon)], na.rm=TRUE),
+            xbar1=mean(acon[is.finite(acon)], na.rm=TRUE),
+
+            # delta (% error)    
+            delta = pct_err(xbar, theo_con),
+
+            # Relative Standard Deviation
+            rsd = rsd(xbar1, std)) %>%
+    
+    
     ungroup()
 
 tables$sens <- filter(sens_sum, delta <= 50 & rsd <= 30) %>%
@@ -314,9 +324,16 @@ tables$acc <-
     # calculate mean, delta, rsd by Assay,sample_ID/Analyst
     group_by(Assay, Sample_ID, Analyst) %>%
     summarize(xbar = geo_mean(acon, na.rm = TRUE),
-              sd = geo_sd(acon, na.rm = TRUE),
-              RSD = rsd(xbar, sd),
-              `Pct Error` = pct_err(xbar, unique(theo_con))) %>%
+              std = sd(acon[is.finite(acon)]),
+              xbar1=mean(acon[is.finite(acon)]),
+              
+              # delta (% error)    
+              delta = pct_err(xbar, theo_con),
+              
+              # Relative Standard Deviation
+              rsd = rsd(xbar1, std),
+            `Pct Error` = pct_err(xbar, unique(theo_con))) %>%
+    
     ungroup() %>%
     rename(`Geometric Mean (AU/mL)` = xbar) %>%
     select(-sd)
@@ -365,30 +382,37 @@ tables$prec <-
     # filter such that delta ≤ 25%
     group_by(prec, Assay, Sample_ID, Analyst, Day) %>%
     mutate(xbar = geo_mean(acon, na.rm = TRUE),
-           std = geo_sd(acon, na.rm = TRUE),
-           rsd = rsd(xbar, std)) %>%
+           std = sd(acon[is.finite(acon)]),
+           xbar1=mean(acon[is.finite(acon)]),
+           # Relative Standard Deviation
+           rsd = rsd(xbar1, std))%>%
     ungroup() %>%
     filter(rsd <= 25) %>%
     
     # start with inter-analyst CV
     group_by(Assay, Sample_ID, Analyst) %>%
     mutate(xbar = geo_mean(acon),
-           std = geo_sd(acon),
-           rsd_inter_analyst = rsd(xbar, std)) %>%
+           std = sd(acon[is.finite(acon)]),
+           xbar1=mean(acon[is.finite(acon)]),
+           # Relative Standard Deviation
+           rsd = rsd(xbar1, std)) %>%
     ungroup() %>%
     
     # inter-day CV
     group_by(Assay, Sample_ID, Day) %>%
     mutate(xbar = geo_mean(acon),
-           std = geo_sd(acon),
-           rsd_inter_day = rsd(xbar, std)) %>%
+           std = sd(acon[is.finite(acon)]),
+           xbar1=mean(acon[is.finite(acon)]),
+           # Relative Standard Deviation
+           rsd_inter_day = rsd(xbar1, std)) %>%
     ungroup() %>%
     
     # intra-day CV
     group_by(Assay, Sample_ID) %>%
     mutate(xbar = geo_mean(acon),
-           std = geo_sd(acon),
-           rsd_intra_day = rsd(xbar, std)) %>%
+           std = sd(acon[is.finite(acon)]),
+           xbar1=mean(acon[is.finite(acon)]), 
+           rsd_intra_day = rsd(xbar1, std)) %>%
     ungroup() %>%
     
     # summarize
@@ -401,20 +425,23 @@ tables$prec <-
 # Other tables
 prec_within_day_by_analyst_sample <- group_by(prec, Assay, Sample_ID, Analyst, Day) %>%
     summarize(xbar = geo_mean(acon, na.rm = TRUE),
-              std = geo_sd(acon, na.rm = TRUE),
-              rsd = rsd(xbar, std)) %>%
+              std = sd(acon[is.finite(acon)]),
+              xbar1=mean(acon[is.finite(acon)]),
+              rsd = rsd(xbar1, std)) %>%
     ungroup()
 
 prec_within_analyst_by_sample <- group_by(prec, Assay, Sample_ID, Analyst) %>%
     summarize(xbar = geo_mean(acon, na.rm = TRUE),
-              std = geo_sd(acon, na.rm = TRUE),
-              rsd = rsd(xbar, std)) %>%
+              std = sd(acon[is.finite(acon)]),
+              xbar1=mean(acon[is.finite(acon)]),
+              rsd = rsd(xbar1, std)) %>%
     ungroup()
 
 prec_by_sample <- group_by(prec, Assay, Sample_ID) %>%
     summarize(xbar = geo_mean(acon, na.rm = TRUE),
-              std = geo_sd(acon, na.rm = TRUE),
-              rsd = rsd(xbar, std)) %>%
+              std = sd(acon[is.finite(acon)]),
+              xbar1=mean(acon[is.finite(acon)]),
+              rsd = rsd(xbar1, std)) %>%
     ungroup()
 
 # put things together for comparison of within / between group RSD
