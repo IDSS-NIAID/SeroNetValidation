@@ -1,5 +1,5 @@
 ---
-title: "Nucleocapsid analysis"
+title: "Luminex Validation"
 output: word_document
 ---
 
@@ -22,25 +22,27 @@ library(knitr)
 source(paste0(root, '/R/helper functions.R'))
 
 # input file
-f <- paste0(root, '/data/COVID19_VAL_Nucleocapsid_Summary.xlsx')
+f <- paste0(root, '/data/COVID19_Luminex Multiplex Assay Validation Database_tk.xlsx')
+
+# pre-validation results to use for accuracy
+f2 <- paste0(root, '/data/COVID19_Luminex Multiplex Assay Pre-Validation Database_DRR.xlsx')
 
 # for monitoring differences in column and sheet names :P
 # default sheet and column names are those provided in the spike data set
 # this compensates for different names in subsequent data sets
-diff <- list(linearity_acon = 'Result (AU/mL)',
-             cutpoint_acon = 'Calculated Result from Titer (AU/mL)',
-             sens_acon = 'Calculated Result (AU/mL)',
-             acc_acon = 'Calculated Result (AU/mL)',
-             prec_sheet = 'Precision',
-             prec_acon = 'Calculated Result (AU/mL)',
-             covr_acon = 'Calculated Result (AU/mL)',
-             freez_acon = 'Calculated Result (AU/mL)',
-             lip_acon = 'Calculated Result (AU/mL)',
-             bili_acon = 'Calculated Result (AU/mL)',
-             hemo_acon = 'Calculated Result (AU/mL)',
-             heat_acon = 'Calculated Result (AU/mL)',
-             conj_acon = 'Calculated Result (AU/mL)',
-             antigen_acon = 'Calculated Result (AU/mL)')
+diff <- list(linearity_acon = 'Result (Calculated Con.)', #'Result (AU/mL)',
+             cutpoint_acon = 'Result ((AU/mL))', #'Calculated Result from Titer (AU/mL)',
+             sens_acon = 'Result ((AU/mL))', #'Calculated Result (AU/mL)',
+             acc_acon = 'Result ((AU/mL))', #'Calculated Result (AU/mL)',
+             prec_sheet = 'PRECISION',
+             prec_acon = 'Result ((AU/mL))', #'Calculated Result (AU/mL)',
+             covr_acon = 'Result ((AU/mL))', #'Calculated Result (AU/mL)',
+             covr_sample_id = 'SID',
+             covr_assay = 'CoVs',
+             stab_acon = 'Result ((AU/mL))', #'Calculated Result (AU/mL)',
+             conj_acon = 'Result ((AU/mL))', #'Calculated Result (AU/mL)',
+             antigen_acon = 'Result ((AU/mL))', #'Calculated Result (AU/mL)'
+             svm_acon = 'Result ((AU/mL))')
 
 # this is where all tables for the report will be stored
 tables <- list()
@@ -48,10 +50,10 @@ tables <- list()
 # summary table 1, displaying acceptance criteria and procedures
 # this will be filled out as we read in data from the source Excel file
 tables$table1 <- tibble(Experiment = c('LLOQ', 'ULOQ', 'Linearity', 'Cutpoint', 'Sensitivity (LLOQ Challenge)',
-                                'Accuracy', 'Precision', 'Specificity', 'Carry-over', 
+                                'Accuracy', 'Precision', 'Carry-over', 
                                 'Stability (Freeze/Thaw, Matrix Components, Sample Integrity)',
-                                'Stability (Critical Reagent Lot Change)'),
-                        #Antigen = NA,
+                                'Stability (Critical Reagent Lot Change)',
+                                'Single vs Multiplex'),
                         `Samples (n)` = NA,
                         Replicates = NA,
                         `Analyst(s)` = NA,
@@ -139,15 +141,6 @@ tables$prec %>%
     kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'prec'), ': Intra/Inter-Day and Inter-Analyst precision. Percent Error ≤ 25% threshold was used to define at which concentrations the assay may be deemed accurate.'))
 ```
 
-## Specificity
-
-Specificity evaluate the ability of the ligand binding assay to measure and analyte in the presence of exogenous and/or endogenous proteins.
-
-```{r specificity table}
-tables$spec %>%
-    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'spec'), ': Specificity.'))
-```
-
 ## Carry-over
 
 Carry-over evaluates the presence of an analyte in a blank sample from a previously analyzed sample with a high concentration of the analyte. This process will detect false positive responses due to errors by the analyst and/or instrument analysis.
@@ -159,23 +152,11 @@ tables$covr %>%
 
 ## Stability
 
-Robustness (Freeze/Thaw, Matrix Components, Lot Change) - evaluate the ability of the starting material (analyte) to remain intact when subjected to various storage/use conditions and presence of various matrix components.
+Robustness (Freeze/Thaw, Matrix Components) - evaluate the ability of the starting material (analyte) to remain intact when subjected to various storage/use conditions and presence of various matrix components.
 
-```{r freeze thaw stability table}
-tables$freez %>%
-    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'freez'), ': Freeze/Thaw results. Passed if the Percent Error ≤25% (1X Freeze/thaw aliquot is the reference).'))
-```
-
-```{r matrix stability table}
-tables$matrx %>%
-    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'matrx'), ': Matrix Components results. Passed if the Percent Error ≤25%. The aliquot without matrix is defined as the reference.'))
-```
-
-Sample Integrity (Heat Treatment) - passed if the Percent Error ≤25%. The aliquot not subjected to heat treatment is defined as the reference. Table 13 describes the Heat results of the HPV9-MIA for each HPV type.
-
-```{r heat stability table}
-tables$heat %>%
-    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'heat'), ': Sample Integrity (Heat Treatment). Passed if the Percent Error ≤25%. The aliquot not subjected to heat treatment is defined as the reference.'))
+```{r stability table}
+tables$stability %>%
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'freez'), ': Stability results. Passed if the Percent Error ≤25% (1X Freeze/thaw and Control aliquots are used as the reference).'))
 ```
 
 
@@ -187,6 +168,12 @@ tables$l2l %>%
     kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'l2l'), ': Critical Reagent Lot Change. Passed if the Percent Error ≤25%. Lot A is defined as the reference. The total number of seropositive results with a Percent Error ≤25% is shown. The Lot passes if 80% of the seropositive samples (ex., 26 of the 32) have a Percent Error ≤25%. All samples below the LLOQ were excluded from analysis.'))
 ```
 
+## Single vs Multiplex Comparisons
+
+```{r svm table}
+tables$svm %>%
+  kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'svm'), ': Comparison of singleplex with multiplex assays. Each comparison passed if the Percent Error ≤25% between the two (geometric means of replicates will be used if there are more than one replicate). The total number of samples, number of samples with percent error ≤25%, and the proportion of total samples passing this threshold are given. Additional details for individual comparisons can be found in the accompanying excel file.'))
+```
 
 ```{r export raw tables}
 ##########################################################
@@ -202,15 +189,11 @@ write_xlsx(list(LLOQ = lloq_sum,
                 Accuracy_by_analyst = acc_by_analyst,
                 Sensitivity = sens_sum,
                 Caryover = covr_sum,
-                Stability_Freez = freez_sum,
-                Stability_Lipemia = lip_sum,
-                Stability_Bilirubin = bili_sum,
-                Stability_Hemolysis = hemo_sum,
-                Stability_Heat = heat_sum,
+                Stability = stability_sum,
                 Lot_to_Lot_Antigen = antigen_sum,
                 Lot_to_Lot_Conjugate = conj_sum,
                 Linearity = lin_sum,
-                Specificity = spec_sum),
-           path = 'Nucleocapsid_Results.xlsx')
+                Single_vs_Multiplex = svm_sum),
+           path = 'Luminex_Validation_Results.xlsx')
 
 ```

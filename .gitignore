@@ -3,5 +3,7 @@
 *.Rhistory
 
 *.xlsx
+*.docx
 
 .DS_Store
+.Rproj.user
