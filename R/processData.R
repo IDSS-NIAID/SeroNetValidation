@@ -224,7 +224,7 @@ sens_sum <- group_by(sens, Assay) %>%
 tables$sens <- filter(sens_sum, delta <= 50 & rsd <= 30) %>%
     group_by(Assay) %>%
     summarize(`Pct Error` = delta[which.min(theo_con)],
-              RSD = rsd[which.min(theo_con)],
+              `CV%` = rsd[which.min(theo_con)],
               `Concentration (AU/mL)` = xbar[which.min(theo_con)]) %>%
     ungroup()
 
@@ -282,7 +282,7 @@ tables$acc <- acc %>%
     group_by(Assay, Sample_ID, Analyst) %>%
     summarize(xbar = geo_mean(acon, na.rm = TRUE),
               sd = geo_sd(acon, na.rm = TRUE),
-              RSD = rsd(xbar, sd, log_scale = TRUE),
+              `CV%` = rsd(xbar, sd, log_scale = TRUE),
               `Pct Error` = pct_err(xbar, unique(theo_con))) %>%
     ungroup() %>%
     rename(`Geometric Mean (AU/mL)` = xbar) %>%
