@@ -29,7 +29,7 @@ geo_sd <- function(x, ...)
         exp()
 }
 
-#' qtl_limits
+#' qtl_limit
 #' Quantile limit (e.g. 95% upper and lower bounds)
 #' 
 #' @param xbar mean of the distribution
@@ -38,15 +38,15 @@ geo_sd <- function(x, ...)
 #' @param qtl quantile for the calculation (default is 0.975 for a 95% confidence interval)
 #' @param log_scale Logical. When TRUE, convert xbar and sd to log scale prior to calculation
 #' 
-#' @return a vector of two values: lower and upper quantile limits
-qtl_limits <- function(xbar, sd, n = 2, qtl = 0.975, log_scale = FALSE)
+#' @return the quantile limit
+qtl_limit <- function(xbar, sd, n = 2, qtl = 0.975, log_scale = FALSE)
 {
   if(log_scale)
   {
-    retval <- log(xbar) + c(1, -1) * qnorm(qtl) * log(sd) / sqrt(n - 1) %>%
+    retval <- (log(xbar) + qnorm(qtl) * log(sd) / sqrt(n - 1)) %>%
       exp() # convert back to non-log scale
   }else{
-    retval <- xbar + c(1, -1) * qnorm(qtl) * sd / sqrt(n - 1)
+    retval <- xbar + qnorm(qtl) * sd / sqrt(n - 1)
   }
   
   return(retval)
@@ -130,9 +130,8 @@ summary_table_update <- function(tables, dat, row, methodology, acceptance)
 #' @param stats Table of summary statistics
 #' @param minmax Function to calculate min/max of statistics in stats_sum
 #' @param which.minmax Corresponding which.min/max function to go along with minmax
-#' @param pctl Percentile to calculate (0.025 for lower, 0.975 for upper)
-#' @param dilution_factor Base dilution factor
-get_summary_table1 <- function(tables, test_name, stats, minmax, which.minmax, pctl, dilution_factor)
+#' @param pctl Percentile to calculate (e.g. 0.025 for lower, 0.975 for upper)
+get_summary_table1 <- function(tables, test_name, stats, minmax, which.minmax, pctl)
 {
     # summary table by sample ID and assay
     # filter by acceptance criteria
@@ -155,17 +154,16 @@ get_summary_table1 <- function(tables, test_name, stats, minmax, which.minmax, p
                               names_prefix = 'Analyst '))
     
     tables[[paste0(test_name, '_sum')]] <- group_by(tmp, Assay) %>%
-      summarize(Mean = mean(statxbar, na.rm = TRUE),
+      summarize(`Geometric Mean` = geo_mean(statxbar, na.rm = TRUE),
                 Median = median(statxbar, na.rm = TRUE),
-                SD = sd(statxbar, na.rm = TRUE),
+                `SD(log Mean)` = log(geo_sd(statxbar, na.rm = TRUE)),
                 Min = min(statxbar, na.rm = TRUE),
-                max = max(statxbar, na.rm = TRUE),
-                ########## review these measures ##########
-                `Upper 95% Confidence Bound` = max(c(Mean + qnorm(pctl)*SD / sqrt(length(statxbar) - 1), # call it the upper bound here and sort out whether we calculated the upper or lower bound below
-                                                     0)),
-                `(AU/mL)` = max(c(Mean + qnorm(pctl)*SD / sqrt(length(statxbar) - 1),
-                                  0)))
-                ###########################################
+                Max = max(statxbar, na.rm = TRUE),
+                # call it the upper bound here and sort out whether we calculated the upper or lower bound below
+                # this will return things backwards if setting qtl to 0.025, so we want 'Upper' either way
+                `Upper 95% Confidence Bound` = 
+                  qtl_limit(`Geometric Mean`, exp(`SD(log Mean)`), 
+                            length(statxbar), qtl = pctl, log_scale = TRUE))
 
     # rename confidence bound if we named it wrong above
     if(pctl < 0.5)

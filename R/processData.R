@@ -52,8 +52,7 @@ tables <- get_summary_table1(tables,
                              stats = lloq_sum,
                              minmax = min,
                              which.minmax = which.min,
-                             pctl = 0.975,
-                             dilution_factor = 50) # base dilution factor - this is what was used before, so I'm assuming it is the same. Might be 150?
+                             pctl = 0.975)
 
                           
 ########
@@ -107,8 +106,7 @@ tables <- get_summary_table1(tables,
                              stats = uloq_sum,
                              minmax = max,
                              which.minmax = which.max,
-                             pctl = 0.025,
-                             dilution_factor = 50) # base dilution factor - this is what was used before, so I'm assuming it is the same. Might be 150?
+                             pctl = 0.025)
 
 
 #############
@@ -184,13 +182,13 @@ cutpt_sum <- group_by(cutpt, Assay, Sample_ID) %>%
     summarize(n = sum(!is.na(acon)),
               xbar = geo_mean(acon, na.rm = TRUE),
               std = geo_sd(acon, na.rm = TRUE),
-              pctl_95 = qtl_limits(xbar, std, qtl = 0.95, log_scale = TRUE)[2]) %>%
+              pctl_95 = qtl_limit(xbar, std, qtl = 0.95, log_scale = TRUE)) %>%
     ungroup()
 
 tables$cutpt <- group_by(cutpt, Assay) %>%
     summarize(xbar = geo_mean(acon, na.rm = TRUE),
               std = geo_sd(acon, na.rm = TRUE),
-              `95th Percentile` = qtl_limits(xbar, std, qtl = 0.95, log_scale = TRUE)[2]) %>%
+              `95th Percentile` = qtl_limit(xbar, std, qtl = 0.95, log_scale = TRUE)) %>%
     ungroup() %>%
     select(-xbar, -std)
 
