@@ -321,7 +321,8 @@ acc_by_analyst <- full_join(acc_by_analyst,
 #### Precision ####
 prec <- read_excel(f, sheet = diff$prec_sheet)
 names(prec)[names(prec) == diff$prec_acon] <- 'acon'
-prec <- filter(prec, !is.na(acon))
+prec <- filter(prec, !is.na(acon) &
+                 !(Assay == 'CoV2 N' & Interpretation == 'Negative'))
 
 # update summary table 1
 tables <- summary_table_update(tables, prec, 'Precision',
@@ -496,7 +497,8 @@ tables$table1$`Acceptance Criteria`[i] <- 'Percent Error ≤ 25%'
 conj <- read_excel(f, sheet = 'Lot-to-Lot Conjugate') %>%
     rename(lot = `Lot Status: Old or New`)
 names(conj)[names(conj) == diff$conj_acon] <- 'acon'
-conj <- filter(conj, !is.na(acon) & !is.na(Assay)) %>%
+conj <- filter(conj, !is.na(acon) & !is.na(Assay) &
+                 !(Assay == 'CoV2 N' & Interpretation == 'Negative')) %>%
     mutate(lot = tolower(lot))
 
 # update summary table 1
@@ -520,7 +522,8 @@ conj_sum <- group_by(conj, Assay, Sample_ID) %>%
 antigen_sum <- read_excel(f, sheet = 'Lot-to-Lot Antigen', na = c('', 'Undefined (>10,000)', '>70000')) %>%
     rename(lot = `Lot Status: Old or New`)
 names(antigen_sum)[names(antigen_sum) == diff$antigen_acon] <- 'acon'
-antigen_sum <- filter(antigen_sum, !is.na(acon) & !is.na(Assay)) %>%
+antigen_sum <- filter(antigen_sum, !is.na(acon) & !is.na(Assay) &
+                        !(Assay == 'CoV2 N' & Interpretation == 'Negative')) %>%
     mutate(lot = tolower(lot)) %>%
     
     # expected concentration

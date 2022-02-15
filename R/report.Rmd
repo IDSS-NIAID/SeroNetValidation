@@ -22,7 +22,7 @@ library(knitr)
 source(paste0(root, '/R/helper functions.R'))
 
 # input file
-f <- paste0(root, '/data/COVID19_Luminex Multiplex Assay Validation Database_tk.xlsx')
+f <- paste0(root, '/data/COVID19_Luminex Multiplex Assay Validation Database_tkV1.xlsx')
 
 # pre-validation results to use for accuracy
 f2 <- paste0(root, '/data/COVID19_Luminex Multiplex Assay Pre-Validation Database_DRR.xlsx')
