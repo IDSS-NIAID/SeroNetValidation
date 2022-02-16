@@ -175,19 +175,20 @@ cutpt <- read_excel(f, sheet = 'CUTPOINT')
 names(cutpt)[names(cutpt) == diff$cutpoint_acon] <- 'acon'
 
 # update summary table 1
-tables <- summary_table_update(tables, cutpt, 'Cutpoint', 'Calculate Geometric Mean and 95th Percentile', '')
+tables <- summary_table_update(tables, cutpt, 'Cutpoint', 'Calculate Geometric Mean and 95% CI', '')
     
 cutpt_sum <- group_by(cutpt, Assay, Sample_ID) %>%
     summarize(n = sum(!is.na(acon)),
               xbar = geo_mean(acon, na.rm = TRUE),
               std = geo_sd(acon, na.rm = TRUE),
-              pctl_95 = qtl_limit(xbar, std, qtl = 0.95, log_scale = TRUE)) %>%
+              upper_95_CI = qtl_limit(xbar, std, n = n, qtl = 0.975, log_scale = TRUE)) %>%
     ungroup()
 
 tables$cutpt <- group_by(cutpt, Assay) %>%
-    summarize(xbar = geo_mean(acon, na.rm = TRUE),
+    summarize(n = sum(!is.na(acon)),
+              xbar = geo_mean(acon, na.rm = TRUE),
               std = geo_sd(acon, na.rm = TRUE),
-              `95th Percentile` = qtl_limit(xbar, std, qtl = 0.95, log_scale = TRUE)) %>%
+              `Upper 95% Confidence Bound` = qtl_limit(xbar, std, n = n, qtl = 0.95, log_scale = TRUE)) %>%
     ungroup() %>%
     select(-xbar, -std)
 

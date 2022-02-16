@@ -117,7 +117,7 @@ Cutpoint examines the levels of analyte in reported naïve COVID (unvaccinated a
 
 ```{r cutpoint table}
 tables$cutpt %>%
-    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'cutpt'), ': 95th percentile of the distribution of COVID naïve samples.'))
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'cutpt'), ': Upper 95% Confidence Interval for COVID naïve samples.'))
 ```
 
 ## Sensitivity
