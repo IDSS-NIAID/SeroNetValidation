@@ -14,7 +14,7 @@ lloq <- read_excel(f, sheet = 'LLOQ', na = c('', 'Sample did not dilute down pro
     filter(acon != 'Range?' & !is.na(acon)) %>%
     
     # base concentration
-    group_by(Assay, Sample_ID, Day, Analyst) %>%
+    group_by(Assay, Sample_ID, Analyst) %>%
     mutate(min_dil_factor = min(Dil_Factor),
            base_con = geo_mean(acon[Dil_Factor == min(Dil_Factor)])) %>%
     ungroup()
@@ -24,11 +24,8 @@ tables <- summary_table_update(tables, lloq, 'LLOQ',
                                'Calculate Geometric Mean, RSD, and Percent Error for each dilution', 
                                'Percent Error ≤ 50%; RSD ≤ 30%')
 
-# set dilution factor
-dilution_factor <- 50
-
 # calculate statistics for each group
-lloq_sum <- group_by(lloq, Assay, Sample_ID, Day, Analyst, Dil_Factor) %>%
+lloq_sum <- group_by(lloq, Assay, Sample_ID, Analyst, Dil_Factor) %>%
     
     # theoretical concentration
       # base_con * min_dil_factor /  # base concentration -> normalize to dilution factor of 1
@@ -38,6 +35,7 @@ lloq_sum <- group_by(lloq, Assay, Sample_ID, Day, Analyst, Dil_Factor) %>%
               # mean
               xbar = geo_mean(acon, na.rm = TRUE),
               std = geo_sd(acon, na.rm = TRUE),
+              n = sum(!is.na(acon)),
               
               # delta (% error)    
               delta = pct_err(xbar, theo_con),
@@ -64,12 +62,12 @@ uloq <- read_excel(f, sheet = 'ULOQ') %>%
     rename(acon = `Result (Calculated Con.)`) %>%
     
     # candidate base concentrations (can't just go with the bottom one on this one)
-    group_by(Assay, Sample_ID, Day, Analyst, Dil_Factor) %>%
+    group_by(Assay, Sample_ID, Analyst, Dil_Factor) %>%
     mutate(base_con = geo_mean(acon, na.rm = TRUE)) %>%
     ungroup() %>%
     
     # pick base concentration closest to 10
-    group_by(Assay, Sample_ID, Day, Analyst) %>%
+    group_by(Assay, Sample_ID, Analyst) %>%
     mutate(base_dil = Dil_Factor[which.min(abs(10 - base_con))],
            base_con = base_con[which.min(abs(10 - base_con))]) %>%
     ungroup()
@@ -82,7 +80,7 @@ tables <- summary_table_update(tables, uloq, 'ULOQ',
 #dilution_factor <- 36450
 
 # calculate statistics for each group
-uloq_sum <- group_by(uloq, Assay, Sample_ID, Day, Analyst, Dil_Factor) %>%
+uloq_sum <- group_by(uloq, Assay, Sample_ID, Analyst, Dil_Factor) %>%
     
     # theoretical concentration
       # base_con * min_dil_factor /  # base concentration -> normalize to dilution factor of 1
@@ -92,6 +90,7 @@ uloq_sum <- group_by(uloq, Assay, Sample_ID, Day, Analyst, Dil_Factor) %>%
               # mean
               xbar = geo_mean(acon, na.rm = TRUE),
               std = geo_sd(acon, na.rm = TRUE),
+              n = sum(!is.na(acon)),
               
               # delta (% error)    
               delta = pct_err(xbar, theo_con),
@@ -116,13 +115,13 @@ tables <- get_summary_table1(tables,
 lin <- read_excel(f, sheet = 'LINEARITY', na = c('', 'Range?'))
 names(lin)[names(lin) == diff$linearity_acon] <- 'acon'
 
-lin <- group_by(lin, Sample_ID, Day, Analyst, Dil_Factor) %>%
+lin <- group_by(lin, Sample_ID, Analyst, Dil_Factor) %>%
     # candidate base concentrations (can't just go with the bottom one on this one)
     mutate(base_con = geo_mean(acon, na.rm = TRUE)) %>%
     ungroup() %>%
     
     # pick base concentration is closest to 10
-    group_by(Assay, Sample_ID, Day, Analyst) %>%
+    group_by(Assay, Sample_ID, Analyst) %>%
     mutate(base_dil = Dil_Factor[which.min(abs(10 - base_con))],
            base_con = base_con[which.min(abs(10 - base_con))]) %>%
     ungroup()
@@ -133,7 +132,7 @@ tables <- summary_table_update(tables, lin, 'Linearity',
                                'Percent Error ≤ 50%; RSD ≤ 30%')
 
 # calculate statistics for each group
-lin_sum <- group_by(lin, Assay, Sample_ID, Day, Analyst, Dil_Factor) %>%
+lin_sum <- group_by(lin, Assay, Sample_ID, Analyst, Dil_Factor) %>%
     
     # theoretical concentration
       # base_con * min_dil_factor /  # base concentration -> normalize to dilution factor of 1
@@ -329,9 +328,9 @@ tables <- summary_table_update(tables, prec, 'Precision',
                                'Calculate Geometric Mean and RSD for Intra-plate, Inter-plate, and Inter-Analyst', 
                                'RSD ≤ 25% for Intra-plate, Inter-plate, and Inter- Analyst')
 
-tables$prec <- 
+tmp <- prec %>%
     # filter such that delta ≤ 25%
-    group_by(prec, Assay, Sample_ID, Analyst, Day) %>%
+    group_by(Assay, Sample_ID, Analyst, Day) %>%
     mutate(xbar = geo_mean(acon, na.rm = TRUE),
            std = geo_sd(acon, na.rm = TRUE),
            rsd = rsd(xbar, std, log_scale = TRUE)) %>%
@@ -340,31 +339,69 @@ tables$prec <-
     
     # start with inter-analyst CV
     group_by(Assay, Sample_ID, Analyst) %>%
-    mutate(xbar = geo_mean(acon),
-           std = geo_sd(acon),
-           rsd_inter_analyst = rsd(xbar, std, log_scale = TRUE)) %>%
+    mutate(inter_analyst_xbar = geo_mean(acon),
+           inter_analyst_std = geo_sd(acon),
+           inter_analyst_n = sum(!is.na(acon))) %>%
     ungroup() %>%
     
     # inter-day CV
     group_by(Assay, Sample_ID, Day) %>%
-    mutate(xbar = geo_mean(acon),
-           std = geo_sd(acon),
-           rsd_inter_day = rsd(xbar, std, log_scale = TRUE)) %>%
+    mutate(inter_day_xbar = geo_mean(acon),
+           inter_day_std = geo_sd(acon),
+           inter_day_n = sum(!is.na(acon))) %>%
     ungroup() %>%
     
     # intra-day CV
     group_by(Assay, Sample_ID) %>%
-    mutate(xbar = geo_mean(acon),
-           std = geo_sd(acon),
-           rsd_intra_day = rsd(xbar, std, log_scale = TRUE)) %>%
-    ungroup() %>%
-    
-    # summarize
-    group_by(Assay) %>%
-    summarize(`Intra-Day CV` = mean(rsd_intra_day),
-              `Inter-Day CV` = mean(rsd_inter_day),
-              `Inter-Analyst CV` = mean(rsd_inter_analyst)) %>%
+    mutate(intra_day_xbar = geo_mean(acon),
+           intra_day_std = geo_sd(acon),
+           intra_day_n = sum(!is.na(acon))) %>%
     ungroup()
+
+# `tmp` has all sorts of duplicate rows for each different grouping, so we do it this way
+tables$prec <- group_by(tmp, Assay) %>% 
+  summarize(`Intra-Day CV` = NA,
+            `Inter-Day CV` = NA,
+            `Inter-Analyst CV` = NA) %>% 
+  ungroup()
+    
+for(i in 1:nrow(tables$prec))
+{
+  # Intra-Day CV
+    # means between High, Mid, and Low are pretty different, but standard deviations should be similar
+    # Since we only care about standard deviation when log_scale = TRUE, we are OK here
+    # we want the standard deviation -> use the weights in `obj` to estimate
+  tables$prec[['Intra-Day CV']][i] <- tmp %>%
+    filter(Assay == tables$prec$Assay[i]) %>%                            # keep only this assay
+    select(Sample_ID, intra_day_xbar, intra_day_std, intra_day_n) %>%    # keep only intra-day statistics
+    unique() %>%                                                         # keep only unique rows
+    with(sum(log(intra_day_std)^2 * intra_day_n) / sum(intra_day_n)) %>% # compute weighted sum of variances, weighting by n
+    sqrt() %>%                                                           # convert to standard deviation
+    exp() %>%                                                            # exponentiate, since that is what rsd() is expecting
+    rsd(xbar = 1, log_scale = TRUE)                                      # pass to rsd() (xbar is ignored when log_scale = TRUE)
+
+  # Inter-Day CV
+    # see comments above for additional details
+  tables$prec[['Inter-Day CV']][i] <- tmp %>%
+    filter(Assay == tables$prec$Assay[i]) %>%
+    select(Sample_ID, inter_day_xbar, inter_day_std, inter_day_n) %>%
+    unique() %>%
+    with(sum(log(inter_day_std)^2 * inter_day_n) / sum(inter_day_n)) %>%
+    sqrt() %>%
+    exp() %>%
+    rsd(xbar = 1, log_scale = TRUE)
+  
+  # Inter-Analyst CV
+    # see comments above for additional details
+  tables$prec[['Inter-Analyst CV']][i] <- tmp %>%
+    filter(Assay == tables$prec$Assay[i]) %>%
+    select(Sample_ID, inter_analyst_xbar, inter_analyst_std, inter_analyst_n) %>%
+    unique() %>%
+    with(sum(log(inter_analyst_std)^2 * inter_analyst_n) / sum(inter_analyst_n)) %>%
+    sqrt() %>%
+    exp() %>%
+    rsd(xbar = 1, log_scale = TRUE)
+}
 
 # Other tables
 prec_within_day_by_analyst_sample <- group_by(prec, Assay, Sample_ID, Analyst, Day) %>%
@@ -417,9 +454,13 @@ tables <- summary_table_update(tables, covr, 'Carry-over',
 
 covr_sum <- get_rsd_by_analyst(covr)
 
-tables$covr <- group_by(covr_sum, Assay, Sample_ID) %>%
-    summarize(`Pct Error` = mean(rsd)) %>%
-    ungroup()
+tables$covr <- covr_sum %>%
+  group_by(Assay, Sample_ID) %>%
+  # only need weighted average of standard deviations for this calculation
+  # see comments on Intra-Day CV for details on calculation (this line is dense, sorry)
+  summarize(`Pct Error` = rsd(xbar = 1, exp(sqrt(sum(log(sdg)^2 * n) / sum(n))), 
+                              log_scale = TRUE)) %>%
+  ungroup()
 
 
 #############

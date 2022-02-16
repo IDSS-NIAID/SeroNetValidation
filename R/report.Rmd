@@ -10,14 +10,16 @@ options(dplyr.summarise.inform = FALSE)
 # repo root directory
 root <- system('git rev-parse --show-toplevel', intern = TRUE)
 
-library(readxl)
 library(dplyr)
 library(purrr)
 library(tidyr)
 
+library(readxl)
 library(writexl)
 
 library(knitr)
+
+library(meta)
 
 source(paste0(root, '/R/helper functions.R'))
 
@@ -124,7 +126,7 @@ Sensitivity - evaluates and challenges the LLOQ value for each analyte.
 
 ```{r sensitivity table}
 tables$sens %>%
-    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'spec'), ': Sensitivity data. Using the criteria that the lowest concentration for each sample was based on the Percent Error ≤50% and Within Dilution CV (replicates) ≤30%.'))
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'sens'), ': Sensitivity data. Using the criteria that the lowest concentration for each sample was based on the Percent Error ≤50% and Within Dilution CV (replicates) ≤30%.'))
 ```
 
 ## Accuracy and Precision

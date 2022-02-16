@@ -140,7 +140,9 @@ get_summary_table1 <- function(tables, test_name, stats, minmax, which.minmax, p
         # calculate min/max concentration that passed - grouped by sample ID and analyst
         group_by(Sample_ID, Assay, Analyst) %>%
         summarize(statxbar = minmax(xbar, na.rm = TRUE),
-                  dilFact = Dil_Factor[which.minmax(xbar)]) %>%
+                  statsd = std[which.minmax(xbar)],
+                  dilFact = Dil_Factor[which.minmax(xbar)],
+                  n = n[which.minmax(xbar)]) %>%
         ungroup() %>%
         
         # drop Analsyt initials and convert to 1/2
@@ -153,22 +155,23 @@ get_summary_table1 <- function(tables, test_name, stats, minmax, which.minmax, p
                               names_from = Analyst, values_from = statxbar,
                               names_prefix = 'Analyst '))
     
+    val <- ifelse(pctl < 0.5, 'lower.fixed', 'upper.fixed')
+    
     tables[[paste0(test_name, '_sum')]] <- group_by(tmp, Assay) %>%
-      summarize(`Geometric Mean` = geo_mean(statxbar, na.rm = TRUE),
+      summarize(metamean_obj = map(1, ~ metamean(n, log(statxbar), log(statsd))),
+                `Geometric Mean` = map_dbl(metamean_obj, ~ exp(.x$TE.fixed)),
                 Median = median(statxbar, na.rm = TRUE),
-                `SD(log Mean)` = log(geo_sd(statxbar, na.rm = TRUE)),
+                `SD(log Mean)` = metamean_obj$seTE.fixed,
                 Min = min(statxbar, na.rm = TRUE),
                 Max = max(statxbar, na.rm = TRUE),
                 # call it the upper bound here and sort out whether we calculated the upper or lower bound below
-                # this will return things backwards if setting qtl to 0.025, so we want 'Upper' either way
-                `Upper 95% Confidence Bound` = 
-                  qtl_limit(`Geometric Mean`, exp(`SD(log Mean)`), 
-                            length(statxbar), qtl = pctl, log_scale = TRUE))
+                `Upper 95% Confidence Bound` = map_dbl(metamean_obj, ~ exp(.x[[val]]))) %>%
+      select(-metamean_obj)
 
     # rename confidence bound if we named it wrong above
     if(pctl < 0.5)
     {
-      names(tables[[paste0(test_name, '_sum')]])[7] <- 'Lower 95% Confidence Bound'
+      names(tables[[paste0(test_name, '_sum')]])[6] <- 'Lower 95% Confidence Bound'
     }
     
     return(tables)
@@ -186,18 +189,20 @@ get_rsd_by_analyst <- function(dat)
     dat_by_analyst <- group_by(dat, Assay, Sample_ID, Analyst) %>%
         summarize(meang = geo_mean(acon, na.rm = TRUE),
                   sdg = geo_sd(acon, na.rm = TRUE),
+                  n = sum(!is.na(acon)),
                   rsd = rsd(meang, sdg, log_scale = TRUE)) %>%
         ungroup()
     
     dat_by_sample <- group_by(dat, Assay, Sample_ID) %>%
         summarize(meang = geo_mean(acon, na.rm = TRUE),
                   sdg = geo_sd(acon, na.rm = TRUE),
+                  n = sum(!is.na(acon)),
                   rsd = rsd(meang, sdg, log_scale = TRUE)) %>%
         ungroup()
     
     full_join(dat_by_analyst,
               dat_by_sample,
-              c("Assay", "Sample_ID", "meang", "sdg", "rsd")) %>%
+              c("Assay", "Sample_ID", "meang", "sdg", "rsd", "n")) %>%
         arrange(Assay, Sample_ID, Analyst) %>%
         mutate(Analyst = ifelse(is.na(Analyst), 'Between Analysts', Analyst)) %>%
         
