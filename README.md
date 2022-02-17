@@ -1,7 +1,7 @@
 This document outlines the methods required for SARS-CoV2 antibody ELISA
-validation testing for SeroNet (see the [SARS-CoV-2 Antibody ELISA
-Validation Testing
-Plan](https://abcs-amp.cancer.gov/uploads/singleton/27302/648c626297fe66fabf658854bb150d68e1f5bb91)
+validation testing for SeroNet (see the [Coronavirus Luinex-based
+15-PLEX Immunoasssay Validation Testing
+Plan](https://abcs-amp.cancer.gov/uploads/external/300/544f6f97076053733ff7f6c3762619ea23b943f2)
 for more details).
 
 ## Tests
@@ -59,7 +59,7 @@ the geometric mean and standard deviation are used.
 <td style="text-align: center;"></td>
 <td style="text-align: left;"></td>
 <td style="text-align: left;"></td>
-<td style="text-align: center;">95th Pctl</td>
+<td style="text-align: center;">Upper 95% CI Bound</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">Sensitivity</td>
@@ -124,37 +124,44 @@ Given a vector of values, *x*<sub>*i*</sub>, of length *n*,
 
 $$ \\log(\\bar{x}\_g) = \\frac{1}{n} \\sum\_{i=1}^n \\log(x\_i). $$
 
+For estimating the geometric mean of groups of replicates performed by
+different analysts (e.g. LLOQ and ULOQ summary results), we use the
+[`meta::metamean()`](https://www.rdocumentation.org/packages/meta/versions/4.9-6/topics/metamean)
+function, with the log means (log *x̄*<sub>*g*</sub>) for each analyst,
+standard deviation of the log mean for each analyst
+(log *s*<sub>*g*</sub>), and the number of replicates for each analyst.
+
 #### Geometric Standard Deviation (*s*<sub>*g*</sub>)
 
 Given a vector of values *x*<sub>*i*</sub>, of length *n*,
 
 $$ \\log(s\_g) = \\frac{1}{\\sqrt(n)} \\sqrt{\\sum\_{i=1}^n \\left\[\\log(x\_i) - \\log(\\bar{x}\_g)\\right\]^2}. $$
 
-#### Relative Standard Deviation (RSD)
+#### Relative Standard Deviation (RSD) / Coefficient of Variation (CV%)
 
-Given the sample standard deviation, *s*<sub>*g*</sub>, and the sample
-mean, *x̄*<sub>*g*</sub>,
+Given the sample standard deviation, *s*, and the sample mean, *x̄*,
 
-$$ RSD = \\frac{100 \* s\_g}{\\bar{x}\_g}. $$
+$$ RSD = \\frac{100 \* s}{\\bar{x}}. $$
 
-#### Coefficient of Variation (CV)
+For log-normally distributed data, RSD is calculated as a function of
+the standard deviation of the log mean, *s*<sub>*g*</sub> (for more
+discussion see [Koopmans, Owen, and
+Rosenblatt](https://doi.org/10.1093%2Fbiomet%2F51.1-2.25)).
 
-Given the sample standard deviation, *s*<sub>*g*</sub>, and the sample
-mean, *x̄*<sub>*g*</sub>,
-
-$$ CV = \\frac{s\_g}{\\bar{x}\_g}. $$
+$$ RSD = \\sqrt{e^{s\_g^2} - 1} $$
 
 ##### Inter-assay variability
 
 Inter-assay variability is calculated as the Coefficient of Variation
-(CV) within the group.
+(CV) within the group (e.g. the group of all replicates of a specific
+sample by a specific analyst).
 
 ##### Intra-assay variability
 
-Intra-assay variability is calculated as the mean CV across groups.
-[Estimating intra- and inter-assay variability in salivary
-cortisol](https://pubmed.ncbi.nlm.nih.gov/21498487/) has some discussion
-on this topic.
+Intra-assay variability is calculated as the mean CV across groups,
+weighting by sample size. [Estimating intra- and inter-assay variability
+in salivary cortisol](https://pubmed.ncbi.nlm.nih.gov/21498487/) has
+some discussion on this topic.
 
 #### Percent Error (δ)
 
@@ -190,11 +197,6 @@ For ULOQ and linearity, many or most of the first results in each
 dilution series are out of range, so we use which ever value is closest
 to 10 as the base value and calculate the expected value from that.
 
-#### Percentile (Pctl)
-
-The 95th percentile is the value, *x*, at which 95% of the distribution
-is less than or equal to *x*.
-
 ## Data format
 
 Each tab of the excel spreadsheet provided is formatted similarly with
@@ -203,16 +205,16 @@ the following variables:
 -   `Assay` - Assay being tested
 -   `Sample_ID` - Differentiates each sample for a specific day. Sample
     IDs are reused each new day.
-    -   This includes the replicate number along with the sample ID for
-        the `LLOQ`, `ULOQ`, and `LINEARITY` tabs. Remove the dash and
-        number at the end of the sample ID for these tabs.
-    -   Range of `Sample_ID` in the `STABILITY_HEAT` tab is
-        `{Heat MED, Heat HIGH, LOW, MED, HIGH}`. The low/med/high
-        designation refers to the concentration level, and heat/no heat
-        is the treatment. This applies to other stability tabs as well.
--   `Treatment` - Treatment applied to the sample. This appears to be
-    constant within each tab and can be ignored.
-    -   Only included in Stability tabs.
+    -   This sometimes includes the replicate number along with the
+        sample ID. Remove the dash and number at the end of the sample
+        ID for these cases.
+    -   Range of `Sample_ID` for heat tests in the `STABILITY` tab is
+        `{High (1X), High (5X), High (10X), High (BIL), High (HB), High (Ctrl), ..., Low (1X), ...}`.
+        The low/high designation refers to the concentration/heat level.
+        Use the `1X` values as control for heat stability and `Ctrl` as
+        control for matrix components.
+-   `Treatment` - Only included in STABILITY tab. Treatment applied to
+    the sample.
 -   `Lot Status: Old or New` - Differentiates between old and new
     antigen lots.
     -   Only included in `Lot-to-Lot Antigen` and `Lot-to-Lot Conjugate`
@@ -221,9 +223,6 @@ the following variables:
 -   `Analyst` - Analyst ID (initials?) to differentiate between samples
     run by different analysts.
 -   `Dil_Factor` - Dilution factor
-    -   Only included in `LLOQ`, `ULOQ` and `LINEARITY` tabs.
--   `OD` - Optical Density. This is a raw instrument value and can be
-    ignored.
     -   Only included in `LLOQ`, `ULOQ` and `LINEARITY` tabs.
 -   `Antigen Lot Number` - Lot number. These are constant for each assay
     in each tab, with the exception of the `Lot-to-Lot Antigen` and
@@ -246,14 +245,16 @@ the following variables:
     This is the primary end point.
     -   “Range?” indicates a sample is beyond the range of detection.
         Most are below the range of detection, but at least some are
-        above. *Will need to consider how to handle these values.*
+        above. Throw these out.
     -   Some cells are blank. These will be treated as missing data.
-    -   Called `Result (Calculated Con.)` in the `LLOQ` and `ULOQ` tabs.
-    -   Called `Result (AU/mL)` in the `LINEARITY` tab.
+    -   Often called `Result (Calculated Con.)` or `Result (AU/mL)`.
 -   `ACon (AU/mL)` - Arbitrary units per mL. *Not sure what to do with
     this. Ignore.*
-    -   Only included in `LLOQ`, `ULOQ` and `LINEARITY` tabs.
-    -   Called `ACon` in the `ULOQ` tab.
-    -   Called `Calculated Results (AU/mL)` in the `LINEARITY` tab.
+    -   Sometimes called `ACon`, `ACon (AU/mL)`, or
+        `Calculated Results (AU/mL)`.
 -   `Result File` - Ignore for analysis purposes
 -   `Plate Map File` - Ignore for analysis purposes
+-   `Interpretation` - Contains “Negative” for some individuals in the
+    CoV2 N assay. These are individuals who have been vaccinated but
+    shouldn’t have any other antibodies. Drop these rows from precision
+    and lot-to-lot calculations.

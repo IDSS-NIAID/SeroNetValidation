@@ -24,9 +24,11 @@ library(meta)
 source(paste0(root, '/R/helper functions.R'))
 
 # input file
+# https://abcs-amp.cancer.gov/uploads/external/299/68f533c6786b5365b4cdcd52d3726cd951c16fa5
 f <- paste0(root, '/data/COVID19_Luminex Multiplex Assay Validation Database_tkV1.xlsx')
 
 # pre-validation results to use for accuracy
+# https://abcs-amp.cancer.gov/uploads/external/298/c5c965d38cb976ab1ede2f99245ce5cfc11e0166
 f2 <- paste0(root, '/data/COVID19_Luminex Multiplex Assay Pre-Validation Database_DRR.xlsx')
 
 # for monitoring differences in column and sheet names :P
