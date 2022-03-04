@@ -45,6 +45,20 @@ lloq_sum <- group_by(lloq, Assay, Sample_ID, Analyst, Dil_Factor) %>%
     
     ungroup()
 
+# estimation of threshold for use in plots below (see `get_summary_table1` for more details)
+lloq_thresh <- lloq_sum %>%
+  filter(delta <= 50 & rsd <= 30) %>%
+  group_by(Sample_ID, Assay, Analyst) %>%
+  summarize(statxbar = min(xbar, na.rm = TRUE),
+            statsd = std[which.min(xbar)],
+            dilFact = Dil_Factor[which.min(xbar)],
+            n = n[which.min(xbar)]) %>%
+  ungroup() %>%
+  group_by(Assay) %>%
+  summarize(lloq = map_dbl(1, ~ exp(metamean(n, log(statxbar), log(statsd))$TE.fixed))) %>%
+  ungroup()
+
+# create lloq table
 tables <- get_summary_table1(tables, 
                              test_name = 'lloq',
                              stats = lloq_sum,
@@ -76,9 +90,6 @@ tables <- summary_table_update(tables, uloq, 'ULOQ',
                                'Calculate Geometric Mean, RSD, and Percent Error for each dilution', 
                                'Percent Error ≤ 50%; RSD ≤ 30%')
 
-# set dilution factor - checking on this?
-#dilution_factor <- 36450
-
 # calculate statistics for each group
 uloq_sum <- group_by(uloq, Assay, Sample_ID, Analyst, Dil_Factor) %>%
     
@@ -100,6 +111,20 @@ uloq_sum <- group_by(uloq, Assay, Sample_ID, Analyst, Dil_Factor) %>%
     
     ungroup()
 
+# estimation of threshold for use in plots below (see `get_summary_table1` for more details)
+uloq_thresh <- uloq_sum %>%
+  filter(delta <= 50 & rsd <= 30) %>%
+  group_by(Sample_ID, Assay, Analyst) %>%
+  summarize(statxbar = max(xbar, na.rm = TRUE),
+            statsd = std[which.max(xbar)],
+            dilFact = Dil_Factor[which.max(xbar)],
+            n = n[which.max(xbar)]) %>%
+  ungroup() %>%
+  group_by(Assay) %>%
+  summarize(uloq = map_dbl(1, ~ exp(metamean(n, log(statxbar), log(statsd))$TE.fixed))) %>%
+  ungroup()
+
+# create uloq table
 tables <- get_summary_table1(tables, 
                              test_name = 'uloq',
                              stats = uloq_sum,
@@ -112,7 +137,45 @@ tables <- get_summary_table1(tables,
 # Linearity #
 #############
 
-lin <- read_excel(f, sheet = 'LINEARITY', na = c('', 'Range?'))
+inconsistent_names <- c('CoV1  S'            = 'CoV1 S',
+                        'CoV1 S'             = 'CoV1 S',
+                        
+                        'Mt.Sinai RBD'       = 'M RBD',
+                        'M RBD'              = 'M RBD',
+                        
+                        'Mt.Sinai RBD E484K' = 'M RBD E484K',
+                        'M RBD E484K'        = 'M RBD E484K',
+                        
+                        'Mt.Sinai RBD SA'    = 'M RBD SA',
+                        'M RBD SA'           = 'M RBD SA',
+                        
+                        'Mt.Sinai RBD UK'    = 'M RBD UK',
+                        'M RBD UK'           = 'M RBD UK',
+                        
+                        '229E S'             = '229E S',
+                        
+                        'CoV2 N'             = 'CoV2 N',
+                        
+                        'CoV2 S'             = 'CoV2 S',
+                        
+                        'HKU1 S'             = 'HKU1 S',
+                        
+                        'MERS S'             = 'MERS S',
+                        
+                        'OC43 S'             = 'OC43 S',
+                        
+                        'NL63 S'             = 'NL63 S',
+                        
+                        'Ragon RBD'          = 'Ragon RBD',
+                        
+                        'Ragon RBD UK'       = 'Ragon RBD UK',
+                        
+                        'RagonRBD E484K'     = 'RagonRBD E484K',
+                        'Ragon RBD E484K'    = 'RagonRBD E484K')
+                       
+
+lin <- read_excel(f, sheet = 'LINEARITY', na = c('', 'Range?')) %>%
+  mutate(Assay = inconsistent_names[Assay])
 names(lin)[names(lin) == diff$linearity_acon] <- 'acon'
 
 lin <- group_by(lin, Sample_ID, Analyst, Dil_Factor) %>%
@@ -123,7 +186,12 @@ lin <- group_by(lin, Sample_ID, Analyst, Dil_Factor) %>%
     # pick base concentration is closest to 10
     group_by(Assay, Sample_ID, Analyst) %>%
     mutate(base_dil = Dil_Factor[which.min(abs(10 - base_con))],
-           base_con = base_con[which.min(abs(10 - base_con))]) %>%
+           base_con = base_con[which.min(abs(10 - base_con))],
+           theo_con = base_con * base_dil / Dil_Factor,
+           
+           # added for debugging purposes
+           delta_indiv = pct_err(acon, theo_con),
+           drop = delta_indiv >= 50) %>%
     ungroup()
 
 # update summary table 1
@@ -137,34 +205,172 @@ lin_sum <- group_by(lin, Assay, Sample_ID, Analyst, Dil_Factor) %>%
     # theoretical concentration
       # base_con * min_dil_factor /  # base concentration -> normalize to dilution factor of 1
       # Dil_Factor                   # divide by dilution factor to calculate expected concentration for each dilution
-    summarize(theo_con = unique(base_con * base_dil / Dil_Factor), # just need one per group
+    summarize(theo_con = unique(theo_con), # just need one per group
               
-              # geometric mean
+              # sample statistics
               xbar = geo_mean(acon, na.rm = TRUE),
               std = geo_sd(acon, na.rm = TRUE),
+              min_acon = min(acon, na.rm = TRUE),
+              max_acon = max(acon, na.rm = TRUE),
               
               # delta (% error)    
               delta = pct_err(xbar, theo_con),
               
               # Relative Standard Deviation
-              rsd = rsd(xbar, std, log_scale = TRUE)) %>%
+              rsd = rsd(xbar, std, log_scale = TRUE),
+              
+              # grab the number of observed replicates and the number with missing data
+              nobs = sum(!is.na(acon)),
+              nmissing = sum(is.na(acon)),
+              
+              # id used for filtering below
+              id = unique(paste(Assay, Sample_ID, Analyst, Dil_Factor))) %>%
     
     ungroup()
 
+##### plots #####
+
+# start by filtering out parts of lin that we aren't using
+lin <- lin %>%
+  mutate(id = paste(Assay, Sample_ID, Analyst, Dil_Factor),
+         keep = id %in% filter(lin_sum, delta < 50 & rsd < 30)$id,
+         lacon = log(acon),
+         ltheo_con = log(theo_con)) %>%
+  
+  # get upper and lower bounds
+  group_by(Assay) %>%
+  mutate(lloq = map_dbl(Assay, ~ filter(lloq_thresh, Assay == .x)$lloq),
+         uloq = map_dbl(Assay, ~ filter(uloq_thresh, Assay == .x)$uloq)) %>%
+  ungroup() %>%
+
+  # filter out observations we don't want to keep
+  filter(keep | (lloq <= acon & acon <= uloq))
+
+# now calculate slopes
+lin_assay_sum <- lin %>%
+  group_by(Assay) %>%
+  summarize(model_good = map(unique(Assay), ~ 
+                               {
+                                 tmp <- filter(lin, Assay == .x & keep)
+                                 if(length(tmp$lacon) > 3)
+                                 {
+                                   return(lme(lacon ~ ltheo_con,
+                                              random = ~ 1 | Sample_ID,
+                                              data = tmp,
+                                              na.action = na.omit))
+                                  }else{
+                                    return(NULL)
+                                  }
+            #                    }),
+            # model_bad = map(unique(Assay), ~ 
+            #                    {
+            #                      tmp <- filter(lin, Assay == .x & !keep)
+            #                      if(length(tmp$lacon) > 3)
+            #                      {
+            #                        return(lme(lacon ~ ltheo_con,
+            #                                   random = ~ 1 | Sample_ID,
+            #                                   data = tmp,
+            #                                   na.action = na.omit))
+            #                      }else{
+            #                        return(NULL)
+            #                      }
+                               }),
+            
+            # number of replicates included in the calculation
+            n_good = sum(keep)) %>%
+  ungroup() %>%
+  
+  mutate(intercept = map_dbl(model_good, ~ 
+                               {
+                                 if(is.null(.x)) 
+                                   return(NA)
+                                 .x$coefficients$fixed['(Intercept)']
+                               }),
+         slope = map_dbl(model_good, ~ 
+                           {
+                             if(is.null(.x)) 
+                               return(NA)
+                             .x$coefficients$fixed['ltheo_con']
+                           }))
+
+
+figures$linearity_OvE_concentration <- 
+  map(unique(lin_sum$Assay), ~ filter(lin_sum, delta < 50 & rsd < 30 & Assay == .x) %>%
+        ggplot(aes(theo_con, xbar)) +
+        
+        # plot points on log10 scale
+        geom_point() +
+        scale_x_log10() +
+        scale_y_log10() +
+        
+        # add spread for each mean
+        geom_errorbar(aes(ymin = min_acon, ymax = max_acon), width = 0) +
+        
+        # add trend line
+        geom_smooth(method = 'lm', se = FALSE, formula = y ~ x) +
+        geom_abline(slope = 1, intercept = 0) +
+        
+        # labels
+        annotate('text', x = 0, y = Inf, 
+                 label = paste(' slope =', round(filter(lin_assay_sum, Assay == .x)$slope, 2)),
+                 hjust = 0, vjust = 1) +
+        ylab('Titer (AU/mL)') +
+        xlab('Theoretical Concentration') +
+        ggtitle(.x))
+
+names(figures$linearity_OvE_concentration) <- unique(lin_sum$Assay)
+
+figures$linearity_OvE_concentration_bad <- 
+  map(unique(lin_sum$Assay), ~ filter(lin_sum, 
+                                      Assay == .x & 
+                                      ((delta < 50 & rsd < 30) |
+                                       (theo_con > filter(lloq_thresh, Assay == .x)$lloq &
+                                        theo_con < filter(uloq_thresh, Assay == .x)$uloq))) %>%
+        ggplot(aes(theo_con, xbar, color = delta < 50 & rsd < 30)) +
+        
+        # plot points on log10 scale
+        geom_point() +
+        scale_x_log10() +
+        scale_y_log10(labels = scales::comma) +
+        
+        # add trend line
+        geom_smooth(method = 'lm', se = TRUE) +
+        geom_abline(slope = 1, intercept = 0) +
+        
+        # add cutoff lines
+        # geom_vline(xintercept = filter(lloq_thresh, Assay == .x)$lloq, linetype = 2) +
+        # geom_vline(xintercept = filter(uloq_thresh, Assay == .x)$uloq, linetype = 2) +
+        
+        # labels
+        ylab('Titer (AU/mL)') +
+        xlab('Theoretical Concentration') +
+        ggtitle(.x))
+
+names(figures$linearity_OvE_concentration_bad) <- unique(lin_sum$Assay)
+
+# ggplot(lin, aes(MFI, acon)) +
+#   geom_point() +
+#   scale_x_log10() +
+#   scale_y_log10() +
+#   geom_smooth(method = 'lm', se = TRUE)
+
+##### final table #####
 # calculate linearity summaries by Assay, Sample_ID
-tables$lin <- filter(lin_sum, delta < 50 & rsd < 30) %>%
-    group_by(Assay, Sample_ID) %>%
-    summarize(n = length(xbar),
-              r = ifelse(n < 3, NA, cor.test(theo_con, xbar)$estimate)) %>%
-    ungroup() %>%
-    
-    group_by(Assay) %>%
-    summarize(`min Accept` = ifelse(length(n) == filter(tables$table1, Experiment == 'Linearity')$`Samples (n)`,
-                                    min(n), 0),
-              `max Accept` = max(n),
-              `min r` = min(r, na.rm = TRUE),
-              `max r` = max(r, na.rm = TRUE)) %>%
-    ungroup()
+tables$lin <- lin_sum %>%
+  mutate(pass = delta < 50 & rsd < 30) %>%
+  group_by(Assay, Sample_ID) %>%
+  summarize(n = length(xbar[pass]),
+            r = ifelse(n < 3, NA, cor.test(theo_con[pass], xbar[pass])$estimate)) %>%
+  ungroup() %>%
+  
+  group_by(Assay) %>%
+  summarize(`min Accept` = ifelse(length(n) == filter(tables$table1, Experiment == 'Linearity')$`Samples (n)`,
+                                  min(n), 0),
+            `max Accept` = max(n),
+            `min r` = min(r, na.rm = TRUE),
+            `max r` = max(r, na.rm = TRUE)) %>%
+  ungroup() %>%
+  right_join(dplyr::select(lin_assay_sum, Assay, slope), by = "Assay")
 
 
 ############

@@ -4,7 +4,7 @@ output: word_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = FALSE, dpi = 300)
 options(dplyr.summarise.inform = FALSE)
 
 # repo root directory
@@ -20,6 +20,12 @@ library(writexl)
 library(knitr)
 
 library(meta)
+
+library(ggplot2)
+library(cowplot)
+theme_set(theme_cowplot())
+
+library(nlme)
 
 source(paste0(root, '/R/helper functions.R'))
 
@@ -48,8 +54,9 @@ diff <- list(linearity_acon = 'Result (Calculated Con.)', #'Result (AU/mL)',
              antigen_acon = 'Result ((AU/mL))', #'Calculated Result (AU/mL)'
              svm_acon = 'Result ((AU/mL))')
 
-# this is where all tables for the report will be stored
+# this is where all tables and figures for the report will be stored
 tables <- list()
+figures <- list()
 
 # summary table 1, displaying acceptance criteria and procedures
 # this will be filled out as we read in data from the source Excel file
@@ -110,8 +117,9 @@ Linearity demonstrates that the analyte of interest, when present in concentrati
 
 ```{r linearity table}
 tables$lin %>%
-    kable(digits = c(NA, 0, 0, 3, 3), caption = paste0('Table ', which(names(tables) == 'lin'), ': Linearity statistics for each Assay, including: minimum and maximum number of replicates passing acceptance criteria (Percent Error ≤ 50% and CV ≤ 30%), and minimum and maximum correlation coefficients.'))
+    kable(digits = c(NA, 0, 0, 3, 3, 2), caption = paste0('Table ', which(names(tables) == 'lin'), ': Linearity statistics for each Assay, including: minimum and maximum number of replicates passing acceptance criteria (Percent Error ≤ 50% and CV ≤ 30%), and minimum and maximum correlation coefficients.'))
 ```
+
 
 ## Cutpoint
 
@@ -177,6 +185,12 @@ tables$l2l %>%
 ```{r svm table}
 tables$svm %>%
   kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'svm'), ': Comparison of singleplex with multiplex assays. Each comparison passed if the Percent Error ≤25% between the two (geometric means of replicates will be used if there are more than one replicate). The total number of samples, number of samples with percent error ≤25%, and the proportion of total samples passing this threshold are given. Additional details for individual comparisons can be found in the accompanying excel file.'))
+```
+
+## Linearity plots
+```{r linearity figures}
+for(i in 1:length(figures$linearity_OvE_concentration))
+  suppressWarnings(print(figures$linearity_OvE_concentration[[i]]))
 ```
 
 ```{r export raw tables}
