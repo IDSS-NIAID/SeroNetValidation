@@ -1,5 +1,5 @@
 ---
-title: "Luminex Validation"
+title: "HPV16VLP Validation"
 output: word_document
 ---
 
@@ -30,28 +30,54 @@ library(nlme)
 source(paste0(root, '/R/helper functions.R'))
 
 # input file
-# https://abcs-amp.cancer.gov/uploads/external/299/68f533c6786b5365b4cdcd52d3726cd951c16fa5
-f <- paste0(root, '/data/COVID19_Luminex Multiplex Assay Validation Database_tkV1.xlsx')
+# https://abcs-amp.cancer.gov/uploads/external/...
+f <- paste0(root, '/data/HSL_VAL_HPV16VLP_Summary_V7_1.xlsx')
 
 # pre-validation results to use for accuracy
-# https://abcs-amp.cancer.gov/uploads/external/298/c5c965d38cb976ab1ede2f99245ce5cfc11e0166
-f2 <- paste0(root, '/data/COVID19_Luminex Multiplex Assay Pre-Validation Database_DRR.xlsx')
+# not used
+f2 <- ''
 
 # for monitoring differences in column and sheet names :P
 # default sheet and column names are those provided in the spike data set
 # this compensates for different names in subsequent data sets
-diff <- list(linearity_acon = 'Result (Calculated Con.)', #'Result (AU/mL)',
-             cutpoint_acon = 'Result ((AU/mL))', #'Calculated Result from Titer (AU/mL)',
-             sens_acon = 'Result ((AU/mL))', #'Calculated Result (AU/mL)',
-             acc_acon = 'Result ((AU/mL))', #'Calculated Result (AU/mL)',
-             prec_sheet = 'PRECISION',
-             prec_acon = 'Result ((AU/mL))', #'Calculated Result (AU/mL)',
-             covr_acon = 'Result ((AU/mL))', #'Calculated Result (AU/mL)',
-             covr_sample_id = 'SID',
-             covr_assay = 'CoVs',
-             stab_acon = 'Result ((AU/mL))', #'Calculated Result (AU/mL)',
-             conj_acon = 'Result ((AU/mL))', #'Calculated Result (AU/mL)',
-             antigen_acon = 'Result ((AU/mL))', #'Calculated Result (AU/mL)'
+diff <- list(lloq_acon = 'Result', #'Result (Calculated Con.)',
+             lloq_assay = 'HPV_Type', #'Assay',
+             uloq_acon = 'Result (EU/mL)', #'Result (Calculated Con.)',
+             uloq_assay = 'HPV_Type', #'Assay',
+             linearity_acon = 'Result (Calculated Con.)', #'Result (AU/mL)',
+             cutpoint_sheet = 'CutPoint', #'CUTPOINT',
+             cutpoint_acon = 'Calculated Titer (EU/mL)', #'Result ((AU/mL))',
+             cutpoint_assay = 'HPV_Type', #'Assay',
+             sens_sheet1 = 'Sensitivity LLOQ', #'LLOQ_Challenge',
+             sens_sheet2 = 'Sensitivity ULOQ', #'LLOQ_Challenge',
+             sens_acon = 'Result', #'Calculated Result (AU/mL)',
+             sens_assay = 'HPV_Type', #'Assay',
+             spec_sheet = 'Specificity',
+             spec_assay = 'HPV_Type',
+             spec_acon = 'Calculated Titer (EU/mL)', #'Calculated Result (EU/mL)',
+             acc_sheet = 'Accuracy', #'ACCURACY',
+             acc_acon = 'Calculated Result (EU/mL)', #'Result ((AU/mL))',
+             acc_assay = 'HPV_Type', #'Assay',
+             prec_sheet = 'Precision', #'PRECISION',
+             prec_acon = 'Calculated Result (EU/mL)', #'Result ((AU/mL))',
+             prec_assay = 'HPV_Type', #'Assay',
+             covr_sheet = 'Carryover', #'CARRYOVER',
+             covr_acon = 'Calculated Titer (EU/mL)', #'Result ((AU/mL))',
+             covr_sample_id = 'Sample_ID', #'SID',
+             covr_assay = 'HPV_Type', #'CoVs', #'Assay',
+             stab_sheet = c('Stability_Freeze Thaw', 'Stability__Lipemia',
+                            'Stability__Bilirubin', 'Stability__Hemolysis',
+                            'Stability__Heat'), #'STABILITY'
+             stab_acon = 'Calculated Result (EU/mL)', #'Result ((AU/mL))',
+             stab_assay = 'HPV_Type', #'Assay',
+             conj_sheet = 'Stability_Conjugate Lot to Lot', #'Lot-to-Lot Conjugate',
+             conj_lot = 'Conjugate Lot', #'Lot Status: Old or New',
+             conj_acon = 'Calculated Result (EU/mL)', #'Result ((AU/mL))',
+             conj_assay = 'HPV_Type', #'Assay',
+             antigen_sheet = 'Stability_VLP Lot to Lot',
+             antigen_lot = 'VLP Lot', #'Lot Status: Old or New',
+             antigen_acon = 'Calculated Result (EU/mL)', #'Result ((AU/mL))',
+             antigen_assay = 'HPV_Type', #'Assay',
              svm_acon = 'Result ((AU/mL))')
 
 # this is where all tables and figures for the report will be stored
@@ -60,8 +86,8 @@ figures <- list()
 
 # summary table 1, displaying acceptance criteria and procedures
 # this will be filled out as we read in data from the source Excel file
-tables$table1 <- tibble(Experiment = c('LLOQ', 'ULOQ', 'Linearity', 'Cutpoint', 'Sensitivity (LLOQ Challenge)',
-                                'Accuracy', 'Precision', 'Carry-over', 
+tables$table1 <- tibble(Experiment = c('LLOQ', 'ULOQ', 'Linearity', 'Cutpoint', 'Sensitivity (LLOQ Challenge)', 'Sensitivity (ULOQ Challenge)',
+                                'Accuracy', 'Specificity', 'Precision', 'Carry-over', 
                                 'Stability (Freeze/Thaw, Matrix Components, Sample Integrity)',
                                 'Stability (Critical Reagent Lot Change)',
                                 'Single vs Multiplex'),
@@ -77,7 +103,7 @@ source(paste0(root, '/R/processData.R'))
 
 ```{r summary table}
 tables$table1 %>%
-    kable(caption = 'Table 1: Spike antigen analysis summary')
+    kable(caption = 'Table 1: Analysis summary')
 ```
 
 
@@ -132,12 +158,27 @@ tables$cutpt %>%
 
 ## Sensitivity
 
-Sensitivity - evaluates and challenges the LLOQ value for each analyte.
+Sensitivity - evaluates and challenges the LLOQ and ULOQ values for each analyte.
 
-```{r sensitivity table}
+```{r lloq sensitivity table}
 tables$sens %>%
-    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'sens'), ': Sensitivity data. Using the criteria that the lowest concentration for each sample was based on the Percent Error ≤50% and Within Dilution CV (replicates) ≤30%.'))
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'sens'), ': Sensitivity data (LLOQ). Using the criteria that the lowest concentration for each sample was based on the Percent Error ≤50% and Within Dilution CV (replicates) ≤30%.'))
 ```
+
+```{r uloq sensitivity table}
+tables$sens2 %>%
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'sens2'), ': Sensitivity data (ULOQ). Using the criteria that the highest concentration for each sample was based on the Percent Error ≤50% and Within Dilution CV (replicates) ≤30%.'))
+```
+
+## Specificity
+
+Specificity evaluates the ability of the ligand binding assay to measure an analyte in the presence of exogenous and/or endogenous proteins.
+
+```{r specificity table}
+tables$spec %>%
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'spec'), ': Specificity.'))
+```
+
 
 ## Accuracy and Precision
 
@@ -174,20 +215,23 @@ tables$stability %>%
 
 ## Lot-to-Lot Comparisons
 
+There were `r nrow(filter(conj_sum, delta == 0))` negative samples in the conjugate lot to lot tests, and `r nrow(filter(antigen_sum, delta == 0))` negative samples in the antigen lot to lot tests. These samples are not included in the table below.
 
 ```{r Lot-to-Lot table}
 tables$l2l %>%
     kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'l2l'), ': Critical Reagent Lot Change. Passed if the Percent Error ≤25%. Lot A is defined as the reference. The total number of seropositive results with a Percent Error ≤25% is shown. The Lot passes if 80% of the seropositive samples (ex., 26 of the 32) have a Percent Error ≤25%. All samples below the LLOQ were excluded from analysis.'))
 ```
 
-## Single vs Multiplex Comparisons
 
 ```{r svm table}
-tables$svm %>%
-  kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'svm'), ': Comparison of singleplex with multiplex assays. Each comparison passed if the Percent Error ≤25% between the two (geometric means of replicates will be used if there are more than one replicate). The total number of samples, number of samples with percent error ≤25%, and the proportion of total samples passing this threshold are given. Additional details for individual comparisons can be found in the accompanying excel file.'))
+## Single vs Multiplex Comparisons
+
+# tables$svm %>%
+#   kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'svm'), ': Comparison of singleplex with multiplex assays. Each comparison passed if the Percent Error ≤25% between the two (geometric means of replicates will be used if there are more than one replicate). The total number of samples, number of samples with percent error ≤25%, and the proportion of total samples passing this threshold are given. Additional details for individual comparisons can be found in the accompanying excel file.'))
 ```
 
 ## Linearity plots
+
 ```{r linearity figures}
 for(i in 1:length(figures$linearity_OvE_concentration))
   suppressWarnings(print(figures$linearity_OvE_concentration[[i]]))
@@ -210,8 +254,8 @@ write_xlsx(list(LLOQ = lloq_sum,
                 Stability = stability_sum,
                 Lot_to_Lot_Antigen = antigen_sum,
                 Lot_to_Lot_Conjugate = conj_sum,
-                Linearity = lin_sum,
-                Single_vs_Multiplex = svm_sum),
+                Linearity = lin_sum),
+                #Single_vs_Multiplex = svm_sum),
            path = 'Luminex_Validation_Results.xlsx')
 
 ```

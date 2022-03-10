@@ -7,15 +7,18 @@
 ########
 
 # read in and process LLOQ data
-lloq <- read_excel(f, sheet = 'LLOQ', na = c('', 'Sample did not dilute down properly-can not use data')) %>%
-    rename(acon = `Result (Calculated Con.)`) %>%
-  
-    # drop out of range samples
+lloq <- read_excel(f, sheet = 'LLOQ', na = c('', 'Sample did not dilute down properly-can not use data'))
+names(lloq)[names(lloq) == diff$lloq_acon] <- 'acon'
+names(lloq)[names(lloq) == diff$lloq_assay] <- 'Assay'
+
+lloq <- lloq %>%
+    # drop out of range samples and convert to numeric
     filter(acon != 'Range?' & !is.na(acon)) %>%
+    mutate(acon = as.numeric(acon)) %>%
     
     # base concentration
     group_by(Assay, Sample_ID, Analyst) %>%
-    mutate(min_dil_factor = min(Dil_Factor),
+    mutate(base_dil = min(Dil_Factor),
            base_con = geo_mean(acon[Dil_Factor == min(Dil_Factor)])) %>%
     ungroup()
 
@@ -28,9 +31,9 @@ tables <- summary_table_update(tables, lloq, 'LLOQ',
 lloq_sum <- group_by(lloq, Assay, Sample_ID, Analyst, Dil_Factor) %>%
     
     # theoretical concentration
-      # base_con * min_dil_factor /  # base concentration -> normalize to dilution factor of 1
-      # Dil_Factor                   # divide by dilution factor to calculate expected concentration for each dilution
-    summarize(theo_con = unique(base_con * min_dil_factor / Dil_Factor), # just need one per group
+      # base_con * base_dil /  # base concentration -> normalize to dilution factor of 1
+      # Dil_Factor             # divide by dilution factor to calculate expected concentration for each dilution
+    summarize(theo_con = unique(base_con * base_dil / Dil_Factor), # just need one per group
               
               # mean
               xbar = geo_mean(acon, na.rm = TRUE),
@@ -58,6 +61,11 @@ lloq_thresh <- lloq_sum %>%
   summarize(lloq = map_dbl(1, ~ exp(metamean(n, log(statxbar), log(statsd))$TE.fixed))) %>%
   ungroup()
 
+# if you see a warning message for this or the update of `tables` on the next line,
+# (warning in metamean about non-positive standard deviations) then there is probably 
+# one or more samples with only a single sample (n == 1). This is OK - it will get
+# skipped.
+
 # create lloq table
 tables <- get_summary_table1(tables, 
                              test_name = 'lloq',
@@ -72,9 +80,15 @@ tables <- get_summary_table1(tables,
 ########
 
 # read in and process ULOQ data
-uloq <- read_excel(f, sheet = 'ULOQ') %>%
-    rename(acon = `Result (Calculated Con.)`) %>%
-    
+uloq <- read_excel(f, sheet = 'ULOQ')
+names(uloq)[names(uloq) == diff$uloq_acon] <- 'acon'
+names(uloq)[names(uloq) == diff$uloq_assay] <- 'Assay'
+
+uloq <- uloq %>%
+    # drop out of range samples and convert to numeric
+    filter(acon != 'Range?' & !is.na(acon)) %>%
+    mutate(acon = as.numeric(acon)) %>%
+  
     # candidate base concentrations (can't just go with the bottom one on this one)
     group_by(Assay, Sample_ID, Analyst, Dil_Factor) %>%
     mutate(base_con = geo_mean(acon, na.rm = TRUE)) %>%
@@ -137,106 +151,59 @@ tables <- get_summary_table1(tables,
 # Linearity #
 #############
 
-inconsistent_names <- c('CoV1  S'            = 'CoV1 S',
-                        'CoV1 S'             = 'CoV1 S',
-                        
-                        'Mt.Sinai RBD'       = 'M RBD',
-                        'M RBD'              = 'M RBD',
-                        
-                        'Mt.Sinai RBD E484K' = 'M RBD E484K',
-                        'M RBD E484K'        = 'M RBD E484K',
-                        
-                        'Mt.Sinai RBD SA'    = 'M RBD SA',
-                        'M RBD SA'           = 'M RBD SA',
-                        
-                        'Mt.Sinai RBD UK'    = 'M RBD UK',
-                        'M RBD UK'           = 'M RBD UK',
-                        
-                        '229E S'             = '229E S',
-                        
-                        'CoV2 N'             = 'CoV2 N',
-                        
-                        'CoV2 S'             = 'CoV2 S',
-                        
-                        'HKU1 S'             = 'HKU1 S',
-                        
-                        'MERS S'             = 'MERS S',
-                        
-                        'OC43 S'             = 'OC43 S',
-                        
-                        'NL63 S'             = 'NL63 S',
-                        
-                        'Ragon RBD'          = 'Ragon RBD',
-                        
-                        'Ragon RBD UK'       = 'Ragon RBD UK',
-                        
-                        'RagonRBD E484K'     = 'RagonRBD E484K',
-                        'Ragon RBD E484K'    = 'RagonRBD E484K')
-                       
+lloq$lab <- 'lloq'
+uloq$lab <- 'uloq'
 
-lin <- read_excel(f, sheet = 'LINEARITY', na = c('', 'Range?')) %>%
-  mutate(Assay = inconsistent_names[Assay])
-names(lin)[names(lin) == diff$linearity_acon] <- 'acon'
-
-lin <- group_by(lin, Sample_ID, Analyst, Dil_Factor) %>%
-    # candidate base concentrations (can't just go with the bottom one on this one)
-    mutate(base_con = geo_mean(acon, na.rm = TRUE)) %>%
-    ungroup() %>%
-    
-    # pick base concentration is closest to 10
-    group_by(Assay, Sample_ID, Analyst) %>%
-    mutate(base_dil = Dil_Factor[which.min(abs(10 - base_con))],
-           base_con = base_con[which.min(abs(10 - base_con))],
-           theo_con = base_con * base_dil / Dil_Factor,
-           
-           # added for debugging purposes
-           delta_indiv = pct_err(acon, theo_con),
-           drop = delta_indiv >= 50) %>%
-    ungroup()
-
+lin <- full_join(lloq, uloq, c("Assay", "Sample_ID", "Analyst", "Dil_Factor", "Day",
+                               "Plate_per_Day", "Sample_per_plate", "Replicate_per_sample",
+                               "acon", "% of first dilution", "base_con", "lab", 
+                               "base_dil")) %>%
+  
+  mutate(theo_con = base_con * base_dil / Dil_Factor)
+  
 # update summary table 1
 tables <- summary_table_update(tables, lin, 'Linearity',
-                               'Calculate Geometric Mean, RSD, and Percent Error for each dilution', 
+                               'Calculate Geometric Mean, RSD, and Percent Error for each dilution',
                                'Percent Error ≤ 50%; RSD ≤ 30%')
 
 # calculate statistics for each group
-lin_sum <- group_by(lin, Assay, Sample_ID, Analyst, Dil_Factor) %>%
-    
+lin_sum <- group_by(lin, Assay, Sample_ID, Analyst, Dil_Factor, lab) %>%
+
     # theoretical concentration
       # base_con * min_dil_factor /  # base concentration -> normalize to dilution factor of 1
       # Dil_Factor                   # divide by dilution factor to calculate expected concentration for each dilution
     summarize(theo_con = unique(theo_con), # just need one per group
-              
+
               # sample statistics
               xbar = geo_mean(acon, na.rm = TRUE),
               std = geo_sd(acon, na.rm = TRUE),
               min_acon = min(acon, na.rm = TRUE),
               max_acon = max(acon, na.rm = TRUE),
-              
-              # delta (% error)    
+
+              # delta (% error)
               delta = pct_err(xbar, theo_con),
-              
+
               # Relative Standard Deviation
               rsd = rsd(xbar, std, log_scale = TRUE),
-              
+
               # grab the number of observed replicates and the number with missing data
               nobs = sum(!is.na(acon)),
               nmissing = sum(is.na(acon)),
-              
+
               # id used for filtering below
-              id = unique(paste(Assay, Sample_ID, Analyst, Dil_Factor))) %>%
-    
+              id = unique(paste(Assay, Sample_ID, Analyst, Dil_Factor, lab))) %>%
+
     ungroup()
 
 ##### plots #####
 
 # start by filtering out parts of lin that we aren't using
 lin <- lin %>%
-  mutate(id = paste(Assay, Sample_ID, Analyst, Dil_Factor),
+  mutate(id = paste(Assay, Sample_ID, Analyst, Dil_Factor, lab),
          keep = id %in% filter(lin_sum, delta < 50 & rsd < 30)$id,
          lacon = log(acon),
          ltheo_con = log(theo_con)) %>%
-  
+
   # get upper and lower bounds
   group_by(Assay) %>%
   mutate(lloq = map_dbl(Assay, ~ filter(lloq_thresh, Assay == .x)$lloq),
@@ -249,7 +216,7 @@ lin <- lin %>%
 # now calculate slopes
 lin_assay_sum <- lin %>%
   group_by(Assay) %>%
-  summarize(model_good = map(unique(Assay), ~ 
+  summarize(model_good = map(unique(Assay), ~
                                {
                                  tmp <- filter(lin, Assay == .x & keep)
                                  if(length(tmp$lacon) > 3)
@@ -261,57 +228,44 @@ lin_assay_sum <- lin %>%
                                   }else{
                                     return(NULL)
                                   }
-            #                    }),
-            # model_bad = map(unique(Assay), ~ 
-            #                    {
-            #                      tmp <- filter(lin, Assay == .x & !keep)
-            #                      if(length(tmp$lacon) > 3)
-            #                      {
-            #                        return(lme(lacon ~ ltheo_con,
-            #                                   random = ~ 1 | Sample_ID,
-            #                                   data = tmp,
-            #                                   na.action = na.omit))
-            #                      }else{
-            #                        return(NULL)
-            #                      }
                                }),
-            
+
             # number of replicates included in the calculation
             n_good = sum(keep)) %>%
   ungroup() %>%
-  
-  mutate(intercept = map_dbl(model_good, ~ 
+
+  mutate(intercept = map_dbl(model_good, ~
                                {
-                                 if(is.null(.x)) 
+                                 if(is.null(.x))
                                    return(NA)
                                  .x$coefficients$fixed['(Intercept)']
                                }),
-         slope = map_dbl(model_good, ~ 
+         slope = map_dbl(model_good, ~
                            {
-                             if(is.null(.x)) 
+                             if(is.null(.x))
                                return(NA)
                              .x$coefficients$fixed['ltheo_con']
                            }))
 
 
-figures$linearity_OvE_concentration <- 
+figures$linearity_OvE_concentration <-
   map(unique(lin_sum$Assay), ~ filter(lin_sum, delta < 50 & rsd < 30 & Assay == .x) %>%
         ggplot(aes(theo_con, xbar)) +
-        
+
         # plot points on log10 scale
         geom_point() +
         scale_x_log10() +
         scale_y_log10() +
-        
+
         # add spread for each mean
         geom_errorbar(aes(ymin = min_acon, ymax = max_acon), width = 0) +
-        
+
         # add trend line
         geom_smooth(method = 'lm', se = FALSE, formula = y ~ x) +
         geom_abline(slope = 1, intercept = 0) +
-        
+
         # labels
-        annotate('text', x = 0, y = Inf, 
+        annotate('text', x = 0, y = Inf,
                  label = paste(' slope =', round(filter(lin_assay_sum, Assay == .x)$slope, 2)),
                  hjust = 0, vjust = 1) +
         ylab('Titer (AU/mL)') +
@@ -320,39 +274,33 @@ figures$linearity_OvE_concentration <-
 
 names(figures$linearity_OvE_concentration) <- unique(lin_sum$Assay)
 
-figures$linearity_OvE_concentration_bad <- 
-  map(unique(lin_sum$Assay), ~ filter(lin_sum, 
-                                      Assay == .x & 
+figures$linearity_OvE_concentration_bad <-
+  map(unique(lin_sum$Assay), ~ filter(lin_sum,
+                                      Assay == .x &
                                       ((delta < 50 & rsd < 30) |
                                        (theo_con > filter(lloq_thresh, Assay == .x)$lloq &
                                         theo_con < filter(uloq_thresh, Assay == .x)$uloq))) %>%
         ggplot(aes(theo_con, xbar, color = delta < 50 & rsd < 30)) +
-        
+
         # plot points on log10 scale
         geom_point() +
         scale_x_log10() +
         scale_y_log10(labels = scales::comma) +
-        
+
         # add trend line
         geom_smooth(method = 'lm', se = TRUE) +
         geom_abline(slope = 1, intercept = 0) +
-        
+
         # add cutoff lines
         # geom_vline(xintercept = filter(lloq_thresh, Assay == .x)$lloq, linetype = 2) +
         # geom_vline(xintercept = filter(uloq_thresh, Assay == .x)$uloq, linetype = 2) +
-        
+
         # labels
         ylab('Titer (AU/mL)') +
         xlab('Theoretical Concentration') +
         ggtitle(.x))
 
 names(figures$linearity_OvE_concentration_bad) <- unique(lin_sum$Assay)
-
-# ggplot(lin, aes(MFI, acon)) +
-#   geom_point() +
-#   scale_x_log10() +
-#   scale_y_log10() +
-#   geom_smooth(method = 'lm', se = TRUE)
 
 ##### final table #####
 # calculate linearity summaries by Assay, Sample_ID
@@ -362,7 +310,7 @@ tables$lin <- lin_sum %>%
   summarize(n = length(xbar[pass]),
             r = ifelse(n < 3, NA, cor.test(theo_con[pass], xbar[pass])$estimate)) %>%
   ungroup() %>%
-  
+
   group_by(Assay) %>%
   summarize(`min Accept` = ifelse(length(n) == filter(tables$table1, Experiment == 'Linearity')$`Samples (n)`,
                                   min(n), 0),
@@ -377,8 +325,9 @@ tables$lin <- lin_sum %>%
 # Cutpoint #
 ############
 
-cutpt <- read_excel(f, sheet = 'CUTPOINT')
+cutpt <- read_excel(f, sheet = diff$cutpoint_sheet, na = c('', 'No value'))
 names(cutpt)[names(cutpt) == diff$cutpoint_acon] <- 'acon'
+names(cutpt)[names(cutpt) == diff$cutpoint_assay] <- 'Assay'
 
 # update summary table 1
 tables <- summary_table_update(tables, cutpt, 'Cutpoint', 'Calculate Geometric Mean and 95% CI', '')
@@ -403,11 +352,12 @@ tables$cutpt <- group_by(cutpt, Assay) %>%
 # Sensitivity #
 ###############
 
-sens <- read_excel(f, sheet = 'LLOQ_Challenge', na = c('', 'Plate failed'))
+#### LLOQ ####
+sens <- read_excel(f, sheet = diff$sens_sheet1, na = c('', 'Plate failed', 'Range?'))
 names(sens)[names(sens) == diff$sens_acon] <- 'acon'
+names(sens)[names(sens) == diff$sens_assay] <- 'Assay'
 
-sens <- filter(sens, !is.na(acon)) %>%
-    mutate(Dil_Factor = 2^(as.numeric(substr(Sample_ID, 7, 7)) - 1)) # calculate dilution factor based on communication with lab folks
+sens <- filter(sens, !is.na(acon))
 
 # update summary table 1
 tables <- summary_table_update(tables, sens, 'Sensitivity (LLOQ Challenge)',
@@ -415,12 +365,12 @@ tables <- summary_table_update(tables, sens, 'Sensitivity (LLOQ Challenge)',
                                'Samples at LLOQ and higher must pass these criteria to accept LLOQ: Percent Error ≤ 50%; RSD ≤ 30%')
 
 # set theoretical concentration at median of all observed results
-sens_sum <- group_by(sens, Assay) %>%
-    mutate(base_con = geo_mean(acon[Sample_ID == 'LLOQ_C1'], na.rm = TRUE)) %>%
+sens_sum <- group_by(sens, Assay, Sample_ID) %>%
+    mutate(base_con = geo_mean(acon[Dil_Factor == 100], na.rm = TRUE)) %>%
     ungroup() %>%
     
-    group_by(Assay, Sample_ID) %>%
-    summarize(theo_con = unique(base_con / Dil_Factor),
+    group_by(Assay, Sample_ID, Dil_Factor) %>%
+    summarize(theo_con = unique(base_con * 100 / Dil_Factor),
               xbar = geo_mean(acon, na.rm = TRUE),
               std = geo_sd(acon, na.rm = TRUE),
               rsd = rsd(xbar, std, log_scale = TRUE),
@@ -428,49 +378,88 @@ sens_sum <- group_by(sens, Assay) %>%
     ungroup()
 
 tables$sens <- filter(sens_sum, delta <= 50 & rsd <= 30) %>%
-    group_by(Assay) %>%
+    group_by(Assay, Sample_ID) %>%
     summarize(`Pct Error` = delta[which.min(theo_con)],
               `CV%` = rsd[which.min(theo_con)],
               `Concentration (AU/mL)` = xbar[which.min(theo_con)]) %>%
     ungroup()
+
+#### ULOQ ####
+sens2 <- read_excel(f, sheet = diff$sens_sheet2, na = c('', 'Plate failed', 'Range?'))
+names(sens2)[names(sens2) == diff$sens_acon] <- 'acon'
+names(sens2)[names(sens2) == diff$sens_assay] <- 'Assay'
+
+sens2 <- filter(sens2, !is.na(acon))
+
+# update summary table 1
+tables <- summary_table_update(tables, sens2, 'Sensitivity (ULOQ Challenge)',
+                               'Calculate Geometric Mean, RSD, and Percent Error for each sample concentration level',
+                               'Samples at LLOQ and higher must pass these criteria to accept LLOQ: Percent Error ≤ 50%; RSD ≤ 30%')
+
+# set theoretical concentration at median of all observed results
+max_dil <- max(sens2$Dil_Factor)
+
+sens2_sum <- group_by(sens2, Assay, Sample_ID) %>%
+  mutate(base_con = geo_mean(acon[Dil_Factor == max_dil], na.rm = TRUE)) %>%
+  ungroup() %>%
+  
+  group_by(Assay, Sample_ID, Dil_Factor) %>%
+  summarize(theo_con = unique(base_con * max_dil / Dil_Factor),
+            xbar = geo_mean(acon, na.rm = TRUE),
+            std = geo_sd(acon, na.rm = TRUE),
+            rsd = rsd(xbar, std, log_scale = TRUE),
+            delta = pct_err(xbar, theo_con)) %>%
+  ungroup()
+
+tables$sens2 <- filter(sens2_sum, delta <= 50 & rsd <= 30) %>%
+  group_by(Assay, Sample_ID) %>%
+  summarize(`Pct Error` = delta[which.max(theo_con)],
+            `CV%` = rsd[which.max(theo_con)],
+            `Concentration (AU/mL)` = xbar[which.max(theo_con)]) %>%
+  ungroup()
+
 
 ##########################
 # Accuracy and Precision #
 ##########################
 
 #### Accuracy ####
-acc <- read_excel(f, sheet = 'ACCURACY') %>%
-  filter(!is.na(Assay))
+acc <- read_excel(f, sheet = diff$acc_sheet)
+names(acc)[names(acc) == diff$acc_assay] <- 'Assay'
 names(acc)[names(acc) == diff$acc_acon] <- 'acon'
 
-# pre-validation data to be used for expected concentration for accuracy
-assay_translation <- c(`CoV2 S` = 'CoV2_S', `CoV2 N` = 'CoV2_N', `CoV1 S` = 'CoV1_S',
-                       `MERS S` = 'MERS_S', `OC43 S` = 'OC43_S', `229E S` = '229E_S',
-                        HKU1    = 'HKU1_S', `NL63 S` = 'NL63_S', `Ragon RBD` = 'R_RBD',
-                       `Ragon RBD UK` = 'R_RBD_UK', `Ragon RBD E484K` = 'R_RBD_E484',
-                       `Mount Sinai RBD` = 'M_RBD', `Mount Sinai RBD UK` = 'M_RBD_UK',
-                       `Mount Sinai RBD SA` = 'M_RBD_SA',
-                       `Mount Sinai RBD E484K` = 'M_RBD_E484K')
-pre_validation <- read_excel(f2, sheet = 'ACC_Tracking', skip = 4)[,-c(43:46)]
+acc <- filter(acc, !is.na(Assay))
 
-for(i in 2:nrow(pre_validation))
-{
-  # propagate assay names down (used merged cells in excel)
-  if(is.na(pre_validation$Assay[i]))
-    pre_validation$Assay[i] <- pre_validation$Assay[i - 1]
-}
+# # pre-validation data to be used for expected concentration for accuracy
+# assay_translation <- c(`CoV2 S` = 'CoV2_S', `CoV2 N` = 'CoV2_N', `CoV1 S` = 'CoV1_S',
+#                        `MERS S` = 'MERS_S', `OC43 S` = 'OC43_S', `229E S` = '229E_S',
+#                         HKU1    = 'HKU1_S', `NL63 S` = 'NL63_S', `Ragon RBD` = 'R_RBD',
+#                        `Ragon RBD UK` = 'R_RBD_UK', `Ragon RBD E484K` = 'R_RBD_E484',
+#                        `Mount Sinai RBD` = 'M_RBD', `Mount Sinai RBD UK` = 'M_RBD_UK',
+#                        `Mount Sinai RBD SA` = 'M_RBD_SA',
+#                        `Mount Sinai RBD E484K` = 'M_RBD_E484K')
+# pre_validation <- read_excel(f2, sheet = 'ACC_Tracking', skip = 4)[,-c(43:46)]
+# 
+# for(i in 2:nrow(pre_validation))
+# {
+#   # propagate assay names down (used merged cells in excel)
+#   if(is.na(pre_validation$Assay[i]))
+#     pre_validation$Assay[i] <- pre_validation$Assay[i - 1]
+# }
 
 # add expected concentration for each Assay and Sample_ID
-acc <- pivot_longer(pre_validation, cols = 3:42, values_to = 'acon') %>%
-  mutate(Sample_ID = gsub('ACC-', '', Samples, fixed = TRUE),
-         Assay = assay_translation[Assay]) %>%
-  select(-name, -Samples) %>%
-  group_by(Assay, Sample_ID) %>%
-  summarize(theo_con = geo_mean(acon)) %>%
-  ungroup() %>%
-  
-  right_join(acc, by = c("Assay", "Sample_ID"))
-  
+# acc <- pivot_longer(pre_validation, cols = 3:42, values_to = 'acon') %>%
+#   mutate(Sample_ID = gsub('ACC-', '', Samples, fixed = TRUE),
+#          Assay = assay_translation[Assay]) %>%
+#   select(-name, -Samples) %>%
+#   group_by(Assay, Sample_ID) %>%
+#   summarize(theo_con = geo_mean(acon)) %>%
+#   ungroup() %>%
+#   
+#   right_join(acc, by = c("Assay", "Sample_ID"))
+
+# I’m unsure of what the theoretical concentration should be. Validation results were provided for the Luminex data, and before that the concentration levels were coded in the sample ID. The concentrations seem to be pretty tight (ranging from 45.37 to 68.25), so I’ve assumed they are all the same and used the mean as the expected concentration.
+acc$theo_con = geo_mean(acc$acon, na.rm = TRUE)  
 
 # update summary table 1
 tables <- summary_table_update(tables, acc, 'Accuracy',
@@ -481,7 +470,7 @@ tables <- summary_table_update(tables, acc, 'Accuracy',
 tables$acc <- acc %>%
     # convert analyst initials to integers in {1,2,...}
     group_by(Assay, Sample_ID) %>%
-    mutate(Analyst = as.numeric(as.factor(Analyst))) %>%
+    mutate(Analyst = as.character(as.numeric(as.factor(Analyst)))) %>%
     ungroup() %>%
     
     # calculate mean, delta, rsd by Assay,sample_ID/Analyst
@@ -493,6 +482,19 @@ tables$acc <- acc %>%
     ungroup() %>%
     rename(`Geometric Mean (AU/mL)` = xbar) %>%
     select(-sd)
+
+tables$acc <- acc %>%
+  group_by(Assay, Sample_ID) %>%
+  summarize(Analyst = 'All',
+            xbar = geo_mean(acon, na.rm = TRUE),
+            sd = geo_sd(acon, na.rm = TRUE),
+            `CV%` = rsd(xbar, sd, log_scale = TRUE)) %>%
+  ungroup() %>%
+  rename(`Geometric Mean (AU/mL)` = xbar) %>%
+  select(-sd) %>%
+  full_join(tables$acc, by = c("Assay", "Sample_ID", "Analyst", 
+                               "Geometric Mean (AU/mL)", 'CV%'))
+  
 
 # other tables
 acc_by_day_analyst <- group_by(acc, Assay, Sample_ID, Analyst, Day) %>%
@@ -527,8 +529,8 @@ acc_by_analyst <- full_join(acc_by_analyst,
 #### Precision ####
 prec <- read_excel(f, sheet = diff$prec_sheet)
 names(prec)[names(prec) == diff$prec_acon] <- 'acon'
-prec <- filter(prec, !is.na(acon) &
-                 !(Assay == 'CoV2 N' & Interpretation == 'Negative'))
+names(prec)[names(prec) == diff$prec_assay] <- 'Assay'
+prec <- filter(prec, !is.na(acon))
 
 # update summary table 1
 tables <- summary_table_update(tables, prec, 'Precision',
@@ -644,15 +646,68 @@ prec_by_analyst <- full_join(prec_within_analyst_by_sample,
     mutate(Analyst = ifelse(is.na(Analyst), 'Between Analysts', Analyst))
 
 
+###############
+# Specificity #
+###############
+
+spec <- read_excel(f, sheet = diff$spec_sheet)
+names(spec)[names(spec) == diff$spec_acon] <- 'acon'
+names(spec)[names(spec) == diff$spec_assay] <- 'Assay'
+
+spec <- spec %>%
+  mutate(acon = ifelse(acon == '<8', 4, as.numeric(acon)),
+         Treatment = strsplit(Sample_ID, '_', fixed = TRUE) %>%
+           map_chr(~ .x[2]))
+
+for(i in 1:nrow(spec))
+{
+  if(grepl('_control', spec$Sample_ID[i], ignore.case = TRUE))
+  {
+    spec$Sample_ID[i] <- gsub('_control', '', spec$Sample_ID[i], ignore.case = TRUE)
+  }else{
+    spec$Sample_ID[i] <- spec$Sample_ID[i - 1]
+  }
+}
+           
+# update summary table 1
+tables <- summary_table_update(tables, spec, 'Specificity',
+                               'Calculate Geometric Mean and RSD',
+                               '1) ≥90% of sample concentration must be inhibited with ... type specific VLPs. 2) Non-spike type specific inhibition must be ≤ 25%.')
+
+# expected concentration
+spec_sum <- group_by(spec, Assay, Sample_ID) %>%
+  mutate(theo_con = geo_mean(acon[Treatment == 'Control'])) %>%
+  ungroup() %>%
+
+  # don't need these anymore
+  filter(Treatment != 'Control') %>%
+
+  # percent error
+  group_by(Assay, Sample_ID, Treatment, theo_con) %>%
+  summarize(`geometric mean` = geo_mean(acon),
+            `Pct Error` = pct_err(`geometric mean`, unique(theo_con))) %>%
+  ungroup()
+
+
+tables$spec <- spec_sum
+
+
 ##############
 # Carry-over #
 ##############
 
-covr <- read_excel(f, sheet = 'CARRYOVER')
+covr <- read_excel(f, sheet = diff$covr_sheet)
 names(covr)[names(covr) == diff$covr_acon] <- 'acon'
 names(covr)[names(covr) == diff$covr_sample_id] <- 'Sample_ID'
 names(covr)[names(covr) == diff$covr_assay] <- 'Assay'
-covr <- filter(covr, !is.na(acon))
+
+covr <- covr %>%
+  mutate(acon = ifelse(acon == '<8', 4, as.numeric(acon))) %>%
+  filter(!is.na(acon)) %>%
+  
+  # some of these ended up with replicate number added on the end of the sample ID
+  mutate(Sample_ID = strsplit(Sample_ID, '_', fixed = TRUE) %>%
+           map_chr(~ .x[1]))
 
 # update summary table 1
 tables <- summary_table_update(tables, covr, 'Carry-over',
@@ -674,30 +729,70 @@ tables$covr <- covr_sum %>%
 # Stability #
 #############
 
-stability <- read_excel(f, sheet = 'STABILITY') %>%
+if(length(diff$stab_sheet) == 1)
+{
+  stability <- read_excel(f, sheet = diff$stab_sheet) %>%
   
-  # drop 1X, 5X, and 10X from Treatment so we can identify samples
-  mutate(test = gsub('\\d+X\\s', '', Treatment))
+    # drop 1X, 5X, and 10X from Treatment so we can identify samples
+    mutate(test = gsub('\\d+X\\s', '', Treatment))
 
-names(stability)[names(stability) == diff$stab_acon] <- 'acon'
-
-
-stability_sum <- filter(stability, !is.na(acon)) %>%
+  names(stability)[names(stability) == diff$stab_acon] <- 'acon'
+  names(stability)[names(stability) == diff$stab_assay] <- 'Assay'
   
-  mutate(lvl = substr(Sample_ID, 1, 1), # figure out concentration level (low/high)
-         trt = Sample_ID,               # the sample id is really the treatment here
-         Sample_ID = Treatment) %>%     # when grouping, we really want to group by "Treatment" in the spreadsheet - swap labels for use in get_pct_err_by_analyst()
-
-  # theoretical concentration
-  group_by(Assay, lvl) %>%
-  mutate(theo_con = median(acon[Sample_ID == ifelse(grepl('Freeze/Thaw', Sample_ID), '1X Freeze/Thaw', 'Control')])) %>%
-  ungroup() %>%
-
-  get_pct_err_by_analyst() %>%
+  stability <- filter(stability, !is.na(acon)) %>%
+    
+    mutate(lvl = substr(Sample_ID, 1, 1), # figure out concentration level (low/high)
+           trt = Sample_ID,               # the sample id is really the treatment here
+           Sample_ID = Treatment) %>%     # when grouping, we really want to group by "Treatment" in the spreadsheet - swap labels for use in get_pct_err_by_analyst()
+    
+    # theoretical concentration
+    group_by(Assay, lvl) %>%
+    mutate(theo_con = median(acon[Sample_ID == ifelse(grepl('Freeze/Thaw', Sample_ID), '1X Freeze/Thaw', 'Control')])) %>%
+    ungroup() %>%
+    
+    filter(! Sample_ID %in% c('Control', '1X Freeze/Thaw')) %>%
+    
+    # now that everything else is sorted out, this is really where this belongs
+    mutate(Treatment = Sample_ID)
   
-  filter(! Sample_ID %in% c('Control', '1X Freeze/Thaw'))
+}else{
+  # combine all sheets into one analysis
+  stability <- map_df(diff$stab_sheet, ~ 
+                      {
+                        # read in each sheet
+                        tmp <- read_excel(f, sheet = .x)
+                        names(tmp)[names(tmp) == diff$stab_acon] <- 'acon'
+                        names(tmp)[names(tmp) == diff$stab_assay] <- 'Assay'
+                        
+                        tmp %>%
+                          
+                          # remove extra crap from Sample_ID and properly label Treatment
+                          mutate(lvl = strsplit(Sample_ID, ' ', fixed = TRUE) %>%
+                                   map_chr(~ .x[length(.x)]),
+                                 Sample_ID = strsplit(Sample_ID, ' ', fixed = TRUE) %>%
+                                   map_chr(~ .x[1]) %>%
+                                   gsub(pattern = 'Heat_', replacement = '', fixed = TRUE),
+                                 Treatment = ifelse(is.na(Treatment) | lvl == '(1X)',
+                                                    'control', Treatment),
+                                 
+                                 # flag different stability experiments
+                                 test = strsplit(.x, '_', fixed = TRUE) %>% 
+                                   map_chr(~ .x[length(.x)])) %>%
+                          
+                          return()
+                      }) %>%
+  
+      # theoretical concentration
+      group_by(Sample_ID, test) %>%
+      mutate(theo_con = geo_mean(acon[Treatment == 'control'], na.rm = TRUE)) %>%
+      ungroup() %>%
+      filter(Treatment != 'control')
+}
 
-tables$stability <- mutate(stability_sum, Treatment = Sample_ID) %>%
+stability_sum <- get_pct_err_by_analyst(stability)
+
+
+tables$stability <- stability_sum %>%
   group_by(Assay, Treatment) %>%
   summarize(`Pct Error` = paste0('≤', round(max(delta), digits = 1)))
 
@@ -742,57 +837,89 @@ tables$table1$`Acceptance Criteria`[i] <- 'Percent Error ≤ 25%'
 # Lot-to-Lot Comparisons #
 ##########################
 
-conj <- read_excel(f, sheet = 'Lot-to-Lot Conjugate') %>%
-    rename(lot = `Lot Status: Old or New`)
+##### Lot to Lot Conjugate #####
+
+conj <- read_excel(f, sheet = diff$conj_sheet)
+names(conj)[names(conj) == diff$conj_lot] <- 'lot'
 names(conj)[names(conj) == diff$conj_acon] <- 'acon'
-conj <- filter(conj, !is.na(acon) & !is.na(Assay) &
-                 !(Assay == 'CoV2 N' & Interpretation == 'Negative')) %>%
-    mutate(lot = tolower(lot))
+names(conj)[names(conj) == diff$conj_assay] <- 'Assay'
+
+conj <- conj %>%
+  mutate(acon = ifelse(acon == '<8', 4, as.numeric(acon)),
+         lot = tolower(lot)) %>%
+  filter(!is.na(acon) & !is.na(Assay))
 
 # update summary table 1
 tables <- summary_table_update(tables, conj, 'Stability (Critical Reagent Lot Change)',
                                'Calculate Geometric Mean and Percent Error', 
                                'Percent Error ≤ 25%')
 
-    # expected concentration
-conj_sum <- group_by(conj, Assay, Sample_ID) %>%
-    mutate(theo_con = geo_mean(acon[lot == 'old'])) %>%
-    ungroup() %>%
-    
-    filter(lot == 'new') %>%
-    
-    group_by(Assay, Sample_ID, theo_con) %>%
-    summarize(xbar = geo_mean(acon, na.rm = TRUE),
-              delta = pct_err(xbar, theo_con)) %>%
-    ungroup()
+# double check that there are two lots per sample
+if(!(group_by(conj, Assay, Sample_ID) %>%
+     summarize(n = length(acon),
+               e = length(unique(lot)) == 2) %>%
+     ungroup() %>%
+     select(e) %>%
+     unlist() %>%
+     all()))
+  stop('Not all Samples are tested with exactly two lots')
+
+# calculate difference between two lots
+conj_sum <- conj %>%
+  group_by(Assay, Sample_ID, lot) %>%
+  summarize(acon = geo_mean(acon, na.rm = TRUE)) %>%
+  ungroup() %>%
+  
+  group_by(Assay, Sample_ID) %>%
+  summarize(lotA = acon[1],
+            lotB = acon[2],
+            delta = pct_err(lotA, lotB)) %>%
+  ungroup()
 
 
-antigen_sum <- read_excel(f, sheet = 'Lot-to-Lot Antigen', na = c('', 'Undefined (>10,000)', '>70000')) %>%
-    rename(lot = `Lot Status: Old or New`)
-names(antigen_sum)[names(antigen_sum) == diff$antigen_acon] <- 'acon'
-antigen_sum <- filter(antigen_sum, !is.na(acon) & !is.na(Assay) &
-                        !(Assay == 'CoV2 N' & Interpretation == 'Negative')) %>%
-    mutate(lot = tolower(lot)) %>%
-    
-    # expected concentration
-    group_by(Assay, Sample_ID) %>%
-    mutate(theo_con = geo_mean(acon[lot == 'old'])) %>%
-    ungroup() %>%
-    
-    filter(lot == 'new') %>%
-    
-    group_by(Assay, Sample_ID, theo_con) %>%
-    summarize(xbar = geo_mean(acon, na.rm = TRUE),
-              delta = pct_err(xbar, theo_con)) %>%
-    ungroup()
+##### Lot to Lot Antigen #####
 
-tables$l2l <- group_by(conj_sum, Assay) %>%
+antigen <- read_excel(f, sheet = diff$antigen_sheet)
+names(antigen)[names(antigen) == diff$antigen_lot] <- 'lot'
+names(antigen)[names(antigen) == diff$antigen_acon] <- 'acon'
+names(antigen)[names(antigen) == diff$antigen_assay] <- 'Assay'
+
+antigen <- antigen %>%
+  mutate(acon = ifelse(acon == '<8', 4, as.numeric(acon)),
+         lot = tolower(lot)) %>%
+  filter(!is.na(acon) & !is.na(Assay))
+
+# double check that there are two lots per sample
+if(!(group_by(antigen, Assay, Sample_ID) %>%
+     summarize(n = length(acon),
+               e = length(unique(lot)) == 2) %>%
+     ungroup() %>%
+     select(e) %>%
+     unlist() %>%
+     all()))
+  stop('Not all Samples are tested with exactly two lots')
+
+# calculate difference between two lots
+antigen_sum <- antigen %>%
+  group_by(Assay, Sample_ID, lot) %>%
+  summarize(acon = geo_mean(acon, na.rm = TRUE)) %>%
+  ungroup() %>%
+  
+  group_by(Assay, Sample_ID) %>%
+  summarize(lotA = acon[1],
+            lotB = acon[2],
+            delta = pct_err(lotA, lotB)) %>%
+  ungroup()
+
+tables$l2l <- filter(conj_sum, delta > 0) %>%
+    group_by(Assay) %>%
     summarize(`Conjugate Passing` = sum(delta <= 25),
               `Conjugate Total` = length(delta),
               `Conjugate w/ Error ≤ 25%` = paste0(round(`Conjugate Passing` / `Conjugate Total`, 3) * 100, "%")) %>%
     ungroup()
 
-tables$l2l <- group_by(antigen_sum, Assay) %>%
+tables$l2l <- filter(antigen_sum, delta > 0) %>%
+    group_by(Assay) %>%
     summarize(`Antigen Passing` = sum(delta <= 25),
               `Antigen Total` = length(delta),
               `Antigen w/ Error ≤ 25%` = paste0(round(`Antigen Passing` / `Antigen Total`, 3) * 100, "%")) %>%
@@ -804,26 +931,26 @@ tables$l2l <- group_by(antigen_sum, Assay) %>%
 # Single vs Multiplex #
 #######################
 
-svm <- read_excel(f, sheet = 'Single vs Multiplex') %>%
-  mutate(multiplex = grepl('multiplex', `Result File`))
-names(svm)[names(svm) == diff$svm_acon] <- 'acon'
-
-# update summary table 1
-tables <- summary_table_update(tables, svm, 'Single vs Multiplex',
-                               'Calculate Geometric Mean and Percent Error', 
-                               'Percent Error ≤ 25%')
-
-# comparison of the two assays
-svm_sum <- svm %>%
-  group_by(Assay, Sample_ID, Analyst) %>%
-  summarize(single    = geo_mean(acon[!multiplex]),
-            multiplex = geo_mean(acon[ multiplex]),
-            delta     = pct_err(multiplex, single)) %>%
-  ungroup()
-
-tables$svm <- svm_sum %>%
-  group_by(Assay) %>%
-  summarize(`Total samples` = length(delta),
-            `Samples passing` = sum(delta <= 25),
-            `% passing` = paste0(round(`Samples passing` / `Total samples`, 3) * 100, '%')) %>%
-  ungroup()
+# svm <- read_excel(f, sheet = 'Single vs Multiplex') %>%
+#   mutate(multiplex = grepl('multiplex', `Result File`))
+# names(svm)[names(svm) == diff$svm_acon] <- 'acon'
+# 
+# # update summary table 1
+# tables <- summary_table_update(tables, svm, 'Single vs Multiplex',
+#                                'Calculate Geometric Mean and Percent Error', 
+#                                'Percent Error ≤ 25%')
+# 
+# # comparison of the two assays
+# svm_sum <- svm %>%
+#   group_by(Assay, Sample_ID, Analyst) %>%
+#   summarize(single    = geo_mean(acon[!multiplex]),
+#             multiplex = geo_mean(acon[ multiplex]),
+#             delta     = pct_err(multiplex, single)) %>%
+#   ungroup()
+# 
+# tables$svm <- svm_sum %>%
+#   group_by(Assay) %>%
+#   summarize(`Total samples` = length(delta),
+#             `Samples passing` = sum(delta <= 25),
+#             `% passing` = paste0(round(`Samples passing` / `Total samples`, 3) * 100, '%')) %>%
+#   ungroup()

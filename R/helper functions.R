@@ -218,19 +218,19 @@ get_rsd_by_analyst <- function(dat)
 #' @return A summary data frame with the following variables: Assay, Sample_ID, Analyst, theo_con, meang, delta
 get_pct_err_by_analyst <- function(dat)
 {
-    dat_by_analyst <- group_by(dat, Assay, Sample_ID, Analyst, theo_con) %>%
+    dat_by_analyst <- group_by(dat, Assay, Sample_ID, Analyst, Treatment, theo_con) %>%
         summarize(meang = geo_mean(acon, na.rm = TRUE),
                   delta = pct_err(meang, unique(theo_con))) %>%
         ungroup()
     
-    dat_by_sample <- group_by(dat, Assay, Sample_ID, theo_con) %>%
+    dat_by_sample <- group_by(dat, Assay, Sample_ID, theo_con, Treatment) %>%
         summarize(meang = geo_mean(acon, na.rm = TRUE),
                   delta = pct_err(meang, unique(theo_con))) %>%
         ungroup()
     
     full_join(dat_by_analyst,
               dat_by_sample,
-              c("Assay", "Sample_ID", "theo_con", "meang", "delta")) %>%
+              c("Assay", "Sample_ID", 'Treatment', "theo_con", "meang", "delta")) %>%
         arrange(Assay, Sample_ID, Analyst) %>%
         mutate(Analyst = ifelse(is.na(Analyst), 'Between Analysts', Analyst)) %>%
         
