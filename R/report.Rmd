@@ -31,7 +31,7 @@ source(paste0(root, '/R/helper functions.R'))
 
 # input file
 # https://abcs-amp.cancer.gov/uploads/external/...
-f <- paste0(root, '/data/HSL_VAL_HPV16VLP_Summary_V7_1.xlsx')
+f <- paste0(root, '/data/HSL_VAL_HPV16VLP_Summary_V8.xlsx')
 
 # pre-validation results to use for accuracy
 # not used
@@ -89,8 +89,7 @@ figures <- list()
 tables$table1 <- tibble(Experiment = c('LLOQ', 'ULOQ', 'Linearity', 'Cutpoint', 'Sensitivity (LLOQ Challenge)', 'Sensitivity (ULOQ Challenge)',
                                 'Accuracy', 'Specificity', 'Precision', 'Carry-over', 
                                 'Stability (Freeze/Thaw, Matrix Components, Sample Integrity)',
-                                'Stability (Critical Reagent Lot Change)',
-                                'Single vs Multiplex'),
+                                'Stability (Critical Reagent Lot Change)'),
                         `Samples (n)` = NA,
                         Replicates = NA,
                         `Analyst(s)` = NA,
@@ -162,12 +161,12 @@ Sensitivity - evaluates and challenges the LLOQ and ULOQ values for each analyte
 
 ```{r lloq sensitivity table}
 tables$sens %>%
-    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'sens'), ': Sensitivity data (LLOQ). Using the criteria that the lowest concentration for each sample was based on the Percent Error ≤50% and Within Dilution CV (replicates) ≤30%.'))
+    kable(digits = c(rep(1,4), 3), caption = paste0('Table ', which(names(tables) == 'sens'), ': Sensitivity data (LLOQ). Using the criteria that the lowest concentration for each sample was based on the Percent Error ≤50% and Within Dilution CV (replicates) ≤30%.'))
 ```
 
 ```{r uloq sensitivity table}
 tables$sens2 %>%
-    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'sens2'), ': Sensitivity data (ULOQ). Using the criteria that the highest concentration for each sample was based on the Percent Error ≤50% and Within Dilution CV (replicates) ≤30%.'))
+    kable(digits = c(rep(1, 4), 2), caption = paste0('Table ', which(names(tables) == 'sens2'), ': Sensitivity data (ULOQ). Using the criteria that the highest concentration for each sample was based on the Percent Error ≤50% and Within Dilution CV (replicates) ≤30%.'))
 ```
 
 ## Specificity
@@ -256,6 +255,6 @@ write_xlsx(list(LLOQ = lloq_sum,
                 Lot_to_Lot_Conjugate = conj_sum,
                 Linearity = lin_sum),
                 #Single_vs_Multiplex = svm_sum),
-           path = 'Luminex_Validation_Results.xlsx')
+           path = 'HPV16_Results.xlsx')
 
 ```
