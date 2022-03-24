@@ -30,7 +30,7 @@ library(nlme)
 source(paste0(root, '/R/helper functions.R'))
 
 # input file
-# https://abcs-amp.cancer.gov/uploads/external/...
+# https://abcs-amp.cancer.gov/uploads/external/312/384125a4200ff92e0f7bb9fe5ff9e3f2f6d14fb9
 f <- paste0(root, '/data/HSL_VAL_HPV16VLP_Summary_V8.xlsx')
 
 # pre-validation results to use for accuracy
