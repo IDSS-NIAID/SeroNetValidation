@@ -218,7 +218,7 @@ lin_assay_sum <- lin %>%
   group_by(Assay) %>%
   summarize(model_good = map(unique(Assay), ~
                                {
-                                 tmp <- filter(lin, Assay == .x & keep)
+                                 tmp <- filter(lin, Assay == .x & keep & is.finite(lacon))
                                  if(length(tmp$lacon) > 3)
                                  {
                                    return(lme(lacon ~ ltheo_con,
@@ -530,7 +530,9 @@ acc_by_analyst <- full_join(acc_by_analyst,
 prec <- read_excel(f, sheet = diff$prec_sheet)
 names(prec)[names(prec) == diff$prec_acon] <- 'acon'
 names(prec)[names(prec) == diff$prec_assay] <- 'Assay'
-prec <- filter(prec, !is.na(acon))
+prec <- mutate(prec, # I think this is a typo - should be '<8'
+               acon = ifelse(acon %in% c('<8', '<7'), 4, as.numeric(acon))) %>%
+  filter(!is.na(acon))
 
 # update summary table 1
 tables <- summary_table_update(tables, prec, 'Precision',

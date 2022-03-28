@@ -1,5 +1,5 @@
 ---
-title: "HPV16VLP Validation"
+title: "HPV18VLP Validation"
 output: word_document
 ---
 
@@ -30,8 +30,8 @@ library(nlme)
 source(paste0(root, '/R/helper functions.R'))
 
 # input file
-# https://abcs-amp.cancer.gov/uploads/external/312/384125a4200ff92e0f7bb9fe5ff9e3f2f6d14fb9
-f <- paste0(root, '/data/HSL_VAL_HPV16VLP_Summary_V8.xlsx')
+# https://abcs-amp.cancer.gov/uploads/external/313/c92ae0f395b560850bc8a3e386be36999e39f020
+f <- paste0(root, '/data/HSL_VAL_HPV18VLP_Summary_V2.xlsx')
 
 # pre-validation results to use for accuracy
 # not used
@@ -255,6 +255,6 @@ write_xlsx(list(LLOQ = lloq_sum,
                 Lot_to_Lot_Conjugate = conj_sum,
                 Linearity = lin_sum),
                 #Single_vs_Multiplex = svm_sum),
-           path = 'HPV16_Results.xlsx')
+           path = 'HPV18_Results.xlsx')
 
 ```
