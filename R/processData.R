@@ -722,7 +722,8 @@ tables$covr <- covr_sum %>%
   group_by(Assay, Sample_ID) %>%
   # only need weighted average of standard deviations for this calculation
   # see comments on Intra-Day CV for details on calculation (this line is dense, sorry)
-  summarize(`Pct Error` = rsd(xbar = 1, exp(sqrt(sum(log(sdg)^2 * n) / sum(n))), 
+  summarize(`geometric mean` = meang,
+            `Pct Error` = rsd(xbar = 1, exp(sqrt(sum(log(sdg)^2 * n) / sum(n))), 
                               log_scale = TRUE)) %>%
   ungroup()
 
