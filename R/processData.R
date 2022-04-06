@@ -1,6 +1,33 @@
 # processData.R
 # should be called from SPIKEanalysis.Rmd
 
+base_rsd_pct <- 25
+base_pct_error <- 30
+
+lloq_rsd_pct <- base_rsd_pct
+lloq_pct_error <- base_pct_error
+
+uloq_rsd_pct <- base_rsd_pct
+uloq_pct_error <- base_pct_error
+
+lin_rsd_pct <- 30
+lin_pct_error <- 50
+
+cutpt_bound <- 0.975
+
+sens_rsd_pct <- base_rsd_pct
+sens_pct_error <- 50
+
+acc_pct_error <- 20
+
+prec_rsd_pct <- 25
+
+spec_inhibit <- 90
+spec_non_inhibit <- 25
+
+covr_rsd_pct <- 20
+
+stab_pct_error <- 20
 
 ########
 # LLOQ #
@@ -25,7 +52,8 @@ lloq <- lloq %>%
 # update summary table 1
 tables <- summary_table_update(tables, lloq, 'LLOQ',
                                'Calculate Geometric Mean, RSD, and Percent Error for each dilution', 
-                               'Percent Error ≤ 50%; RSD ≤ 30%')
+                               paste0('Percent Error ≤ ', lloq_pct_error, '%; ',
+                                      'RSD ≤ ', lloq_rsd_pct, '%'))
 
 # calculate statistics for each group
 lloq_sum <- group_by(lloq, Assay, Sample_ID, Analyst, Dil_Factor) %>%
@@ -50,9 +78,9 @@ lloq_sum <- group_by(lloq, Assay, Sample_ID, Analyst, Dil_Factor) %>%
 
 # estimation of threshold for use in plots below (see `get_summary_table1` for more details)
 lloq_thresh <- lloq_sum %>%
-  filter(delta <= 50 & rsd <= 30) %>%
+  filter(delta <= lloq_pct_error & rsd <= lloq_rsd_pct) %>%
   group_by(Sample_ID, Assay, Analyst) %>%
-  summarize(statxbar = min(xbar, na.rm = TRUE),
+  summarize(statxbar = min(xbar,na.rm = TRUE),
             statsd = std[which.min(xbar)],
             dilFact = Dil_Factor[which.min(xbar)],
             n = n[which.min(xbar)]) %>%
@@ -102,7 +130,8 @@ uloq <- uloq %>%
 
 tables <- summary_table_update(tables, uloq, 'ULOQ',
                                'Calculate Geometric Mean, RSD, and Percent Error for each dilution', 
-                               'Percent Error ≤ 50%; RSD ≤ 30%')
+                               paste0('Percent Error ≤ ', uloq_pct_error, '%; ',
+                                      'RSD ≤ ', uloq_rsd_pct, '%'))
 
 # calculate statistics for each group
 uloq_sum <- group_by(uloq, Assay, Sample_ID, Analyst, Dil_Factor) %>%
@@ -127,7 +156,7 @@ uloq_sum <- group_by(uloq, Assay, Sample_ID, Analyst, Dil_Factor) %>%
 
 # estimation of threshold for use in plots below (see `get_summary_table1` for more details)
 uloq_thresh <- uloq_sum %>%
-  filter(delta <= 50 & rsd <= 30) %>%
+  filter(delta <= uloq_pct_error & rsd <= uloq_rsd_pct) %>%
   group_by(Sample_ID, Assay, Analyst) %>%
   summarize(statxbar = max(xbar, na.rm = TRUE),
             statsd = std[which.max(xbar)],
@@ -164,7 +193,7 @@ lin <- full_join(lloq, uloq, c("Assay", "Sample_ID", "Analyst", "Dil_Factor", "D
 # update summary table 1
 tables <- summary_table_update(tables, lin, 'Linearity',
                                'Calculate Geometric Mean, RSD, and Percent Error for each dilution',
-                               'Percent Error ≤ 50%; RSD ≤ 30%')
+                               paste0('Percent Error ≤ ', lin_pct_error, '%; RSD ≤ ', lin_rsd_pct, '%'))
 
 # calculate statistics for each group
 lin_sum <- group_by(lin, Assay, Sample_ID, Analyst, Dil_Factor, lab) %>%
@@ -200,7 +229,7 @@ lin_sum <- group_by(lin, Assay, Sample_ID, Analyst, Dil_Factor, lab) %>%
 # start by filtering out parts of lin that we aren't using
 lin <- lin %>%
   mutate(id = paste(Assay, Sample_ID, Analyst, Dil_Factor, lab),
-         keep = id %in% filter(lin_sum, delta < 50 & rsd < 30)$id,
+         keep = id %in% filter(lin_sum, delta <= lin_pct_error & rsd <= lin_rsd_pct)$id,
          lacon = log(acon),
          ltheo_con = log(theo_con)) %>%
 
@@ -249,7 +278,7 @@ lin_assay_sum <- lin %>%
 
 
 figures$linearity_OvE_concentration <-
-  map(unique(lin_sum$Assay), ~ filter(lin_sum, delta < 50 & rsd < 30 & Assay == .x) %>%
+  map(unique(lin_sum$Assay), ~ filter(lin_sum, delta <= lin_pct_error & rsd <= lin_rsd_pct & Assay == .x) %>%
         ggplot(aes(theo_con, xbar)) +
 
         # plot points on log10 scale
@@ -277,10 +306,10 @@ names(figures$linearity_OvE_concentration) <- unique(lin_sum$Assay)
 figures$linearity_OvE_concentration_bad <-
   map(unique(lin_sum$Assay), ~ filter(lin_sum,
                                       Assay == .x &
-                                      ((delta < 50 & rsd < 30) |
+                                      ((delta < lin_pct_error & rsd < lin_rsd_pct) |
                                        (theo_con > filter(lloq_thresh, Assay == .x)$lloq &
                                         theo_con < filter(uloq_thresh, Assay == .x)$uloq))) %>%
-        ggplot(aes(theo_con, xbar, color = delta < 50 & rsd < 30)) +
+        ggplot(aes(theo_con, xbar, color = delta < lin_pct_error & rsd < lin_rsd_pct)) +
 
         # plot points on log10 scale
         geom_point() +
@@ -305,7 +334,7 @@ names(figures$linearity_OvE_concentration_bad) <- unique(lin_sum$Assay)
 ##### final table #####
 # calculate linearity summaries by Assay, Sample_ID
 tables$lin <- lin_sum %>%
-  mutate(pass = delta < 50 & rsd < 30) %>%
+  mutate(pass = delta < lin_pct_error & rsd < lin_rsd_pct) %>%
   group_by(Assay, Sample_ID) %>%
   summarize(n = length(xbar[pass]),
             r = ifelse(n < 3, NA, cor.test(theo_con[pass], xbar[pass])$estimate)) %>%
@@ -336,14 +365,14 @@ cutpt_sum <- group_by(cutpt, Assay, Sample_ID) %>%
     summarize(n = sum(!is.na(acon)),
               xbar = geo_mean(acon, na.rm = TRUE),
               std = geo_sd(acon, na.rm = TRUE),
-              upper_95_CI = qtl_limit(xbar, std, n = n, qtl = 0.975, log_scale = TRUE)) %>%
+              upper_95_CI = qtl_limit(xbar, std, n = n, qtl = cutpt_bound, log_scale = TRUE)) %>%
     ungroup()
 
 tables$cutpt <- group_by(cutpt, Assay) %>%
     summarize(n = sum(!is.na(acon)),
               xbar = geo_mean(acon, na.rm = TRUE),
               std = geo_sd(acon, na.rm = TRUE),
-              `Upper 95% Confidence Bound` = qtl_limit(xbar, std, n = n, qtl = 0.95, log_scale = TRUE)) %>%
+              `Upper 95% Confidence Bound` = qtl_limit(xbar, std, n = n, qtl = cutpt_bound, log_scale = TRUE)) %>%
     ungroup() %>%
     select(-xbar, -std)
 
@@ -362,7 +391,7 @@ sens <- filter(sens, !is.na(acon))
 # update summary table 1
 tables <- summary_table_update(tables, sens, 'Sensitivity (LLOQ Challenge)',
                                'Calculate Geometric Mean, RSD, and Percent Error for each sample concentration level',
-                               'Samples at LLOQ and higher must pass these criteria to accept LLOQ: Percent Error ≤ 50%; RSD ≤ 30%')
+                               paste0('Samples at LLOQ and higher must pass these criteria to accept LLOQ: Percent Error ≤ ', sens_pct_error, '%; RSD ≤ ', sens_rsd_pct, '%'))
 
 # set theoretical concentration at median of all observed results
 sens_sum <- group_by(sens, Assay, Sample_ID) %>%
@@ -377,7 +406,7 @@ sens_sum <- group_by(sens, Assay, Sample_ID) %>%
               delta = pct_err(xbar, theo_con)) %>%
     ungroup()
 
-tables$sens <- filter(sens_sum, delta <= 50 & rsd <= 30) %>%
+tables$sens <- filter(sens_sum, delta <= sens_pct_error & rsd <= sens_rsd_pct) %>%
     group_by(Assay, Sample_ID) %>%
     summarize(`Pct Error` = delta[which.min(theo_con)],
               `CV%` = rsd[which.min(theo_con)],
@@ -394,7 +423,7 @@ sens2 <- filter(sens2, !is.na(acon))
 # update summary table 1
 tables <- summary_table_update(tables, sens2, 'Sensitivity (ULOQ Challenge)',
                                'Calculate Geometric Mean, RSD, and Percent Error for each sample concentration level',
-                               'Samples at LLOQ and higher must pass these criteria to accept LLOQ: Percent Error ≤ 50%; RSD ≤ 30%')
+                               paste0('Samples at LLOQ and higher must pass these criteria to accept LLOQ: Percent Error ≤ ', sens_pct_error, '%; RSD ≤ ', sens_rsd_pct, '%'))
 
 # set theoretical concentration at median of all observed results
 max_dil <- max(sens2$Dil_Factor)
@@ -411,7 +440,7 @@ sens2_sum <- group_by(sens2, Assay, Sample_ID) %>%
             delta = pct_err(xbar, theo_con)) %>%
   ungroup()
 
-tables$sens2 <- filter(sens2_sum, delta <= 50 & rsd <= 30) %>%
+tables$sens2 <- filter(sens2_sum, delta <= sens_pct_error & rsd <= sens_rsd_pct) %>%
   group_by(Assay, Sample_ID) %>%
   summarize(`Pct Error` = delta[which.max(theo_con)],
             `CV%` = rsd[which.max(theo_con)],
@@ -464,7 +493,7 @@ acc$theo_con = geo_mean(acc$acon, na.rm = TRUE)
 # update summary table 1
 tables <- summary_table_update(tables, acc, 'Accuracy',
                                'Calculate Geometric Mean and Percent Error', 
-                               'Percent Error ≤ 25%')
+                               paste0('Percent Error ≤ ', acc_pct_error, '%'))
 
 
 tables$acc <- acc %>%
@@ -537,7 +566,7 @@ prec <- mutate(prec, # I think this is a typo - should be '<8'
 # update summary table 1
 tables <- summary_table_update(tables, prec, 'Precision',
                                'Calculate Geometric Mean and RSD for Intra-plate, Inter-plate, and Inter-Analyst', 
-                               'RSD ≤ 25% for Intra-plate, Inter-plate, and Inter- Analyst')
+                               paste0('RSD ≤ ', prec_rsd_pct, '% for Intra-plate, Inter-plate, and Inter- Analyst'))
 
 tmp <- prec %>%
     # filter such that delta ≤ 25%
@@ -546,7 +575,7 @@ tmp <- prec %>%
            std = geo_sd(acon, na.rm = TRUE),
            rsd = rsd(xbar, std, log_scale = TRUE)) %>%
     ungroup() %>%
-    filter(rsd <= 25) %>%
+    filter(rsd <= prec_rsd_pct) %>%
     
     # start with inter-analyst CV
     group_by(Assay, Sample_ID, Analyst) %>%
@@ -674,7 +703,7 @@ for(i in 1:nrow(spec))
 # update summary table 1
 tables <- summary_table_update(tables, spec, 'Specificity',
                                'Calculate Geometric Mean and RSD',
-                               '1) ≥90% of sample concentration must be inhibited with ... type specific VLPs. 2) Non-spike type specific inhibition must be ≤ 25%.')
+                               paste0('1) ≥', spec_inhibit, '% of sample concentration must be inhibited with type-specific VLPs. 2) Non-type-specific inhibition must be ≤ ', spec_non_inhibit, '%.'))
 
 # expected concentration
 spec_sum <- group_by(spec, Assay, Sample_ID) %>%
@@ -714,7 +743,7 @@ covr <- covr %>%
 # update summary table 1
 tables <- summary_table_update(tables, covr, 'Carry-over',
                                'Calculate Geometric Mean and RSD', 
-                               'RSD ≤ 25% for Low and High sample. The Neg_Serum sample must be ≤ LLOQ.')
+                               paste0('RSD ≤ ', covr_rsd_pct, '% for Low and High sample. The Neg_Serum sample must be ≤ LLOQ.'))
 
 covr_sum <- get_rsd_by_analyst(covr)
 
@@ -832,7 +861,7 @@ tables$table1$`Days (Runs)`[i] <- group_by(stability, test) %>%
   paste(collapse = '-')
 
 tables$table1$Methodology[i] <- 'Calculate Geometric Mean and Percent Error'
-tables$table1$`Acceptance Criteria`[i] <- 'Percent Error ≤ 25%'
+tables$table1$`Acceptance Criteria`[i] <- paste0('Percent Error ≤ ', stab_pct_error, '%')
 
 
 
@@ -855,7 +884,7 @@ conj <- conj %>%
 # update summary table 1
 tables <- summary_table_update(tables, conj, 'Stability (Critical Reagent Lot Change)',
                                'Calculate Geometric Mean and Percent Error', 
-                               'Percent Error ≤ 25%')
+                               paste0('Percent Error ≤ ', stab_pct_error, '%'))
 
 # double check that there are two lots per sample
 if(!(group_by(conj, Assay, Sample_ID) %>%
@@ -916,14 +945,14 @@ antigen_sum <- antigen %>%
 
 tables$l2l <- filter(conj_sum, delta > 0) %>%
     group_by(Assay) %>%
-    summarize(`Conjugate Passing` = sum(delta <= 25),
+    summarize(`Conjugate Passing` = sum(delta <= stab_pct_error),
               `Conjugate Total` = length(delta),
               `Conjugate w/ Error ≤ 25%` = paste0(round(`Conjugate Passing` / `Conjugate Total`, 3) * 100, "%")) %>%
     ungroup()
 
 tables$l2l <- filter(antigen_sum, delta > 0) %>%
     group_by(Assay) %>%
-    summarize(`Antigen Passing` = sum(delta <= 25),
+    summarize(`Antigen Passing` = sum(delta <= stab_pct_error),
               `Antigen Total` = length(delta),
               `Antigen w/ Error ≤ 25%` = paste0(round(`Antigen Passing` / `Antigen Total`, 3) * 100, "%")) %>%
     ungroup() %>%

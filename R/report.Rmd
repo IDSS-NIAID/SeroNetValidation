@@ -112,7 +112,7 @@ The lowest reportable concentration of each analyte in the multiplex assay that 
 
 ```{r lloq table}
 tables$lloq %>%
-    kable(digits = 3, caption = paste0('Table ', which(names(tables) == 'lloq'), ': The lowest concentration for each sample, assay and analyst, based on the Percent Error ≤ 50% and within Dilution CV (replicates) ≤ 30%. The concentration units are represented as Arbitrary Units (AU)/mL.'))
+    kable(digits = 3, caption = paste0('Table ', which(names(tables) == 'lloq'), ': The lowest concentration for each sample, assay and analyst, based on the Percent Error ≤ ', lloq_pct_error, '% and within Dilution CV (replicates) ≤ ', lloq_rsd_pct, '%. The concentration units are represented as Arbitrary Units (AU)/mL.'))
 ```
 
 ```{r lloq stats table}
@@ -123,11 +123,11 @@ tables$lloq_sum %>%
 
 ## ULOQ (Upper limit of quantitation)
 
-The highest reportable concentration of each analte in the multiplex assay that passes established criteria.
+The highest reportable concentration of each analyte in the multiplex assay that passes established criteria.
 
 ```{r uloq table}
 tables$uloq %>%
-    kable(digits = 3, caption = paste0('Table ', which(names(tables) == 'uloq'), ': The highest concentration for each sample, assay and analyst, based on the Percent Error ≤ 50% and within Dilution CV (replicates) ≤ 30%. The concentration units are represented as Arbitrary Units (AU)/mL.'))
+    kable(digits = 3, caption = paste0('Table ', which(names(tables) == 'uloq'), ': The highest concentration for each sample, assay and analyst, based on the Percent Error ≤ ', uloq_pct_error, '% and within Dilution CV (replicates) ≤ ', uloq_rsd_pct, '%. The concentration units are represented as Arbitrary Units (AU)/mL.'))
 ```
 
 ```{r uloq stats table}
@@ -142,13 +142,13 @@ Linearity demonstrates that the analyte of interest, when present in concentrati
 
 ```{r linearity table}
 tables$lin %>%
-    kable(digits = c(NA, 0, 0, 3, 3, 2), caption = paste0('Table ', which(names(tables) == 'lin'), ': Linearity statistics for each Assay, including: minimum and maximum number of replicates passing acceptance criteria (Percent Error ≤ 50% and CV ≤ 30%), and minimum and maximum correlation coefficients.'))
+    kable(digits = c(NA, 0, 0, 3, 3, 2), caption = paste0('Table ', which(names(tables) == 'lin'), ': Linearity statistics for each Assay, including: minimum and maximum number of replicates passing acceptance criteria (Percent Error ≤ ', lin_pct_error, '% and CV ≤ ', lin_rsd_pct, '%), and minimum and maximum correlation coefficients.'))
 ```
 
 
 ## Cutpoint
 
-Cutpoint examines the levels of analyte in reported naïve COVID (unvaccinated and presumably unexposed to COVID) subjects to establish a population-based lower limit of quantitation based on established criteria.
+Cutpoint examines the levels of analyte in reported naïve subjects to establish a population-based lower limit of quantitation based on established criteria.
 
 ```{r cutpoint table}
 tables$cutpt %>%
@@ -161,12 +161,12 @@ Sensitivity - evaluates and challenges the LLOQ and ULOQ values for each analyte
 
 ```{r lloq sensitivity table}
 tables$sens %>%
-    kable(digits = c(rep(1,4), 3), caption = paste0('Table ', which(names(tables) == 'sens'), ': Sensitivity data (LLOQ). Using the criteria that the lowest concentration for each sample was based on the Percent Error ≤50% and Within Dilution CV (replicates) ≤30%.'))
+    kable(digits = c(rep(1,4), 3), caption = paste0('Table ', which(names(tables) == 'sens'), ': Sensitivity data (LLOQ). Using the criteria that the lowest concentration for each sample was based on the Percent Error ≤', sens_pct_error, '% and Within Dilution CV (replicates) ≤ ', sens_rsd_pct, '%.'))
 ```
 
 ```{r uloq sensitivity table}
 tables$sens2 %>%
-    kable(digits = c(rep(1, 4), 2), caption = paste0('Table ', which(names(tables) == 'sens2'), ': Sensitivity data (ULOQ). Using the criteria that the highest concentration for each sample was based on the Percent Error ≤50% and Within Dilution CV (replicates) ≤30%.'))
+    kable(digits = c(rep(1, 4), 2), caption = paste0('Table ', which(names(tables) == 'sens2'), ': Sensitivity data (ULOQ). Using the criteria that the highest concentration for each sample was based on the Percent Error ≤ ', sens_pct_error, '% and Within Dilution CV (replicates) ≤ ', sens_rsd_pct, '%.'))
 ```
 
 ## Specificity
@@ -185,12 +185,12 @@ Accuracy and Precision evaluate the closeness of agreement between the true valu
 
 ```{r accuracy table}
 tables$acc %>%
-    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'acc'), ': Percent Error and RSD for each sample. ACC_L1 sample was defined as the true value. Percent Error ≤ 25% threshold was used to define at which concentrations the assay may be deemed accurate.'))
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'acc'), ': Percent Error and RSD for each sample. The sample geometric mean was used as the true value. Percent Error ≤ ', acc_pct_error, '% threshold was used to define at which concentrations the assay may be deemed accurate.'))
 ```
 
 ```{r precision table}
 tables$prec %>%
-    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'prec'), ': Intra/Inter-Day and Inter-Analyst precision. Percent Error ≤ 25% threshold was used to define at which concentrations the assay may be deemed accurate.'))
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'prec'), ': Intra/Inter-Day and Inter-Analyst precision. CV ≤ ', prec_rsd_pct, '% threshold was used to define at which concentrations the assay may be deemed accurate.'))
 ```
 
 ## Carry-over
@@ -199,7 +199,7 @@ Carry-over evaluates the presence of an analyte in a blank sample from a previou
 
 ```{r caryover table}
 tables$covr %>%
-    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'covr'), ': Carry-over results for spike assay. The assay Carry-over passed if the percent error ≤25% (replicates) for both samples, and the negative sample is ≤LLOQ.'))
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'covr'), ': Carry-over results for each assay. The assay Carry-over passed if CV ≤ ', covr_rsd_pct, '% (replicates) for both samples, and the negative sample is ≤ LLOQ.'))
 ```
 
 ## Stability
@@ -208,7 +208,7 @@ Robustness (Freeze/Thaw, Matrix Components) - evaluate the ability of the starti
 
 ```{r stability table}
 tables$stability %>%
-    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'freez'), ': Stability results. Passed if the Percent Error ≤25% (1X Freeze/thaw and Control aliquots are used as the reference).'))
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'freez'), ': Stability results. Passed if the Percent Error ≤ ', stab_pct_error, '% (1X Freeze/thaw and Control aliquots are used as the reference).'))
 ```
 
 
@@ -218,7 +218,7 @@ There were `r nrow(filter(conj_sum, delta == 0))` negative samples in the conjug
 
 ```{r Lot-to-Lot table}
 tables$l2l %>%
-    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'l2l'), ': Critical Reagent Lot Change. Passed if the Percent Error ≤25%. Lot A is defined as the reference. The total number of seropositive results with a Percent Error ≤25% is shown. The Lot passes if 80% of the seropositive samples (ex., 26 of the 32) have a Percent Error ≤25%. All samples below the LLOQ were excluded from analysis.'))
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'l2l'), ': Critical Reagent Lot Change. Passed if the Percent Error ≤ ', stab_pct_error, '%. Lot A is defined as the reference. The total number of seropositive results with a Percent Error ≤', stab_pct_error, '% is shown. The Lot passes if 80% of the seropositive samples (ex., 26 of the 32) have a Percent Error ≤', stab_pct_error, '%. All samples below the LLOQ were excluded from analysis.'))
 ```
 
 
