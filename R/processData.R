@@ -386,20 +386,35 @@ sens <- read_excel(f, sheet = diff$sens_sheet1, na = c('', 'Plate failed', 'Rang
 names(sens)[names(sens) == diff$sens_acon] <- 'acon'
 names(sens)[names(sens) == diff$sens_assay] <- 'Assay'
 
-sens <- filter(sens, !is.na(acon))
+sens <- filter(sens, !is.na(acon)) %>%
+  mutate(lacon = log(acon),
+         ldil_factor = log(Dil_Factor))
 
 # update summary table 1
 tables <- summary_table_update(tables, sens, 'Sensitivity (LLOQ Challenge)',
                                'Calculate Geometric Mean, RSD, and Percent Error for each sample concentration level',
                                paste0('Samples at LLOQ and higher must pass these criteria to accept LLOQ: Percent Error ≤ ', sens_pct_error, '%; RSD ≤ ', sens_rsd_pct, '%'))
 
-# set theoretical concentration at median of all observed results
-sens_sum <- group_by(sens, Assay, Sample_ID) %>%
-    mutate(base_con = geo_mean(acon[Dil_Factor == 100], na.rm = TRUE)) %>%
-    ungroup() %>%
+# run linear model for lloq sensitivity to estimate expected acon
+sens_lloq_models <- sens %>%
+  filter(acon >= unlist(tables$lloq_sum[1,'Geometric Mean']),
+         acon <= unlist(tables$uloq_sum[1,'Geometric Mean'])) %>%
+  
+  group_by(Assay, Sample_ID) %>%
+  summarize(model = map(1, ~ lm(lacon ~ ldil_factor))) %>%
+  ungroup()
+
+# get predictions and summary statistics
+sens_sum <- sens %>%
     
     group_by(Assay, Sample_ID, Dil_Factor) %>%
-    summarize(theo_con = unique(base_con * 100 / Dil_Factor),
+    summarize(theo_con = pmap_dbl(list(assay = Assay, id = Sample_ID, dil = log(Dil_Factor)),
+                                  function(assay, id, dil)
+                                  {
+                                    with(filter(sens_lloq_models, Assay == assay & Sample_ID == id),
+                                         predict(model[[1]], newdata = data.frame(ldil_factor = dil))) %>%
+                                      exp()
+                                  }),
               xbar = geo_mean(acon, na.rm = TRUE),
               std = geo_sd(acon, na.rm = TRUE),
               rsd = rsd(xbar, std, log_scale = TRUE),
@@ -418,22 +433,35 @@ sens2 <- read_excel(f, sheet = diff$sens_sheet2, na = c('', 'Plate failed', 'Ran
 names(sens2)[names(sens2) == diff$sens_acon] <- 'acon'
 names(sens2)[names(sens2) == diff$sens_assay] <- 'Assay'
 
-sens2 <- filter(sens2, !is.na(acon))
+sens2 <- filter(sens2, !is.na(acon)) %>%
+  mutate(lacon = log(acon),
+         ldil_factor = log(Dil_Factor))
 
 # update summary table 1
 tables <- summary_table_update(tables, sens2, 'Sensitivity (ULOQ Challenge)',
                                'Calculate Geometric Mean, RSD, and Percent Error for each sample concentration level',
                                paste0('Samples at LLOQ and higher must pass these criteria to accept LLOQ: Percent Error ≤ ', sens_pct_error, '%; RSD ≤ ', sens_rsd_pct, '%'))
 
-# set theoretical concentration at median of all observed results
-max_dil <- max(sens2$Dil_Factor)
+# run linear model for uloq sensitivity to estimate expected acon
+sens_uloq_models <- sens2 %>%
+  filter(acon >= unlist(tables$lloq_sum[1,'Geometric Mean']),
+         acon <= unlist(tables$uloq_sum[1,'Geometric Mean'])) %>%
+  
+  group_by(Assay, Sample_ID) %>%
+  summarize(model = map(1, ~ lm(lacon ~ ldil_factor))) %>%
+  ungroup()
 
-sens2_sum <- group_by(sens2, Assay, Sample_ID) %>%
-  mutate(base_con = geo_mean(acon[Dil_Factor == max_dil], na.rm = TRUE)) %>%
-  ungroup() %>%
+# get predictions and summary statistics
+sens2_sum <- sens2 %>%
   
   group_by(Assay, Sample_ID, Dil_Factor) %>%
-  summarize(theo_con = unique(base_con * max_dil / Dil_Factor),
+  summarize(theo_con = pmap_dbl(list(assay = Assay, id = Sample_ID, dil = log(Dil_Factor)),
+                                function(assay, id, dil)
+                                {
+                                  with(filter(sens_uloq_models, Assay == assay & Sample_ID == id),
+                                       predict(model[[1]], newdata = data.frame(ldil_factor = dil))) %>%
+                                    exp()
+                                }),
             xbar = geo_mean(acon, na.rm = TRUE),
             std = geo_sd(acon, na.rm = TRUE),
             rsd = rsd(xbar, std, log_scale = TRUE),
