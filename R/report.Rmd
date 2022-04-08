@@ -169,16 +169,6 @@ tables$sens2 %>%
     kable(digits = c(rep(1, 4), 2), caption = paste0('Table ', which(names(tables) == 'sens2'), ': Sensitivity data (ULOQ). Using the criteria that the highest concentration for each sample was based on the Percent Error ≤ ', sens_pct_error, '% and Within Dilution CV (replicates) ≤ ', sens_rsd_pct, '%.'))
 ```
 
-## Specificity
-
-Specificity evaluates the ability of the ligand binding assay to measure an analyte in the presence of exogenous and/or endogenous proteins.
-
-```{r specificity table}
-tables$spec %>%
-    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'spec'), ': Specificity.'))
-```
-
-
 ## Accuracy and Precision
 
 Accuracy and Precision evaluate the closeness of agreement between the true value and experimental value of a sample (Accuracy) and the degree of variability of a series of measurements of a homogeneous sample (Precision).
@@ -191,6 +181,15 @@ tables$acc %>%
 ```{r precision table}
 tables$prec %>%
     kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'prec'), ': Intra/Inter-Day and Inter-Analyst precision. CV ≤ ', prec_rsd_pct, '% threshold was used to define at which concentrations the assay may be deemed accurate.'))
+```
+
+## Specificity
+
+Specificity evaluates the ability of the ligand binding assay to measure an analyte in the presence of exogenous and/or endogenous proteins.
+
+```{r specificity table}
+tables$spec %>%
+    kable(digits = 1, caption = paste0('Table ', which(names(tables) == 'spec'), ': Specificity.'))
 ```
 
 ## Carry-over
