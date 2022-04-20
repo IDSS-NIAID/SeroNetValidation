@@ -30,8 +30,8 @@ library(nlme)
 source(paste0(root, '/R/helper functions.R'))
 
 # input file
-# https://abcs-amp.cancer.gov/uploads/external/312/384125a4200ff92e0f7bb9fe5ff9e3f2f6d14fb9
-f <- paste0(root, '/data/HSL_VAL_HPV16VLP_Summary_V8.xlsx')
+# https://abcs-amp.cancer.gov/uploads/external/317/353692c6b3c99f92385b2b87c6755049752919af
+f <- paste0(root, '/data/HSL_VAL_HPV16VLP_Summary_V8.1.xlsx')
 
 # pre-validation results to use for accuracy
 # not used
@@ -56,7 +56,8 @@ diff <- list(lloq_acon = 'Result', #'Result (Calculated Con.)',
              spec_assay = 'HPV_Type',
              spec_acon = 'Calculated Titer (EU/mL)', #'Calculated Result (EU/mL)',
              acc_sheet = 'Accuracy', #'ACCURACY',
-             acc_acon = 'Calculated Result (EU/mL)', #'Result ((AU/mL))',
+             acc_theo = 'Theoretical Result (IU/mL)',
+             acc_acon = 'Experimental Result (IU/mL)', #'Calculated Result (EU/mL)', #'Result ((AU/mL))',
              acc_assay = 'HPV_Type', #'Assay',
              prec_sheet = 'Precision', #'PRECISION',
              prec_acon = 'Calculated Result (EU/mL)', #'Result ((AU/mL))',
