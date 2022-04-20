@@ -484,39 +484,9 @@ tables$sens2 <- filter(sens2_sum, delta <= sens_pct_error & rsd <= sens_rsd_pct)
 acc <- read_excel(f, sheet = diff$acc_sheet)
 names(acc)[names(acc) == diff$acc_assay] <- 'Assay'
 names(acc)[names(acc) == diff$acc_acon] <- 'acon'
+names(acc)[names(acc) == diff$acc_theo] <- 'theo_con'
 
 acc <- filter(acc, !is.na(Assay))
-
-# # pre-validation data to be used for expected concentration for accuracy
-# assay_translation <- c(`CoV2 S` = 'CoV2_S', `CoV2 N` = 'CoV2_N', `CoV1 S` = 'CoV1_S',
-#                        `MERS S` = 'MERS_S', `OC43 S` = 'OC43_S', `229E S` = '229E_S',
-#                         HKU1    = 'HKU1_S', `NL63 S` = 'NL63_S', `Ragon RBD` = 'R_RBD',
-#                        `Ragon RBD UK` = 'R_RBD_UK', `Ragon RBD E484K` = 'R_RBD_E484',
-#                        `Mount Sinai RBD` = 'M_RBD', `Mount Sinai RBD UK` = 'M_RBD_UK',
-#                        `Mount Sinai RBD SA` = 'M_RBD_SA',
-#                        `Mount Sinai RBD E484K` = 'M_RBD_E484K')
-# pre_validation <- read_excel(f2, sheet = 'ACC_Tracking', skip = 4)[,-c(43:46)]
-# 
-# for(i in 2:nrow(pre_validation))
-# {
-#   # propagate assay names down (used merged cells in excel)
-#   if(is.na(pre_validation$Assay[i]))
-#     pre_validation$Assay[i] <- pre_validation$Assay[i - 1]
-# }
-
-# add expected concentration for each Assay and Sample_ID
-# acc <- pivot_longer(pre_validation, cols = 3:42, values_to = 'acon') %>%
-#   mutate(Sample_ID = gsub('ACC-', '', Samples, fixed = TRUE),
-#          Assay = assay_translation[Assay]) %>%
-#   select(-name, -Samples) %>%
-#   group_by(Assay, Sample_ID) %>%
-#   summarize(theo_con = geo_mean(acon)) %>%
-#   ungroup() %>%
-#   
-#   right_join(acc, by = c("Assay", "Sample_ID"))
-
-# I’m unsure of what the theoretical concentration should be. Validation results were provided for the Luminex data, and before that the concentration levels were coded in the sample ID. The concentrations seem to be pretty tight (ranging from 45.37 to 68.25), so I’ve assumed they are all the same and used the mean as the expected concentration.
-acc$theo_con = geo_mean(acc$acon, na.rm = TRUE)  
 
 # update summary table 1
 tables <- summary_table_update(tables, acc, 'Accuracy',
@@ -545,12 +515,14 @@ tables$acc <- acc %>%
   summarize(Analyst = 'All',
             xbar = geo_mean(acon, na.rm = TRUE),
             sd = geo_sd(acon, na.rm = TRUE),
-            `CV%` = rsd(xbar, sd, log_scale = TRUE)) %>%
+            `CV%` = rsd(xbar, sd, log_scale = TRUE),
+            `Pct Error` = pct_err(xbar, unique(theo_con))) %>%
   ungroup() %>%
   rename(`Geometric Mean (AU/mL)` = xbar) %>%
   select(-sd) %>%
   full_join(tables$acc, by = c("Assay", "Sample_ID", "Analyst", 
-                               "Geometric Mean (AU/mL)", 'CV%'))
+                               "Geometric Mean (AU/mL)", 'CV%',
+                               'Pct Error'))
   
 
 # other tables
