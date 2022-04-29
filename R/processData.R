@@ -172,6 +172,22 @@ inconsistent_names <- c('CoV1  S'            = 'CoV1 S',
                         
                         'RagonRBD E484K'     = 'RagonRBD E484K',
                         'Ragon RBD E484K'    = 'RagonRBD E484K')
+
+full_assay_name <- c('CoV1 S'         = 'CoV-1 S',
+                     'M RBD'          = 'RBD WT (M)',
+                     'M RBD E484K'    = 'RBD mutant E484K (M)',
+                     'M RBD SA'       = 'RBD triple mutant (M)',
+                     'M RBD UK'       = 'RBD mutant N501Y (M)',
+                     '229E S'         = '229E CoV S',
+                     'CoV2 N'         = 'CoV-2 N',
+                     'CoV2 S'         = 'CoV-2 S',
+                     'HKU1 S'         = 'HKU1 CoV S',
+                     'MERS S'         = 'MERS CoV S',
+                     'OC43 S'         = 'OC43 CoV S',
+                     'NL63 S'         = 'NL63 CoV S',
+                     'Ragon RBD'      = 'RBD WT (R)',
+                     'Ragon RBD UK'   = 'RBD mutant N501Y (R)',
+                     'RagonRBD E484K' = 'RBD mutant E484K (R)')
                        
 
 lin <- read_excel(f, sheet = 'LINEARITY', na = c('', 'Range?')) %>%
@@ -293,30 +309,65 @@ lin_assay_sum <- lin %>%
                              .x$coefficients$fixed['ltheo_con']
                            }))
 
+ranges <- lin_sum %>%
+  filter(delta < 50 & rsd < 30 & theo_con > 0 & !is.na(xbar)) %>%
+  group_by(Assay) %>%
+  summarize(amin = min(c(theo_con, xbar)),
+            amax = max(c(theo_con, xbar))) %>%
+  ungroup() %>%
+  summarize(amin = min(amin),
+            amax = max(amax),
+            lmin = log10(amin),
+            lmax = log10(amax))
+
+axis_labs <- tibble(breaks = c(seq(from =    0.001, to =    0.009, length = 9),
+                               seq(from =    0.01 , to =    0.09 , length = 9),
+                               seq(from =    0.1  , to =    0.9  , length = 9),
+                               seq(from =    1    , to =    9    , length = 9),
+                               seq(from =   10    , to =   90    , length = 9),
+                               seq(from =  100    , to =  900    , length = 9),
+                                          1000                                ),
+                    labels = c(   '0.001', rep('', 8),
+                                  '0.01' , rep('', 8),
+                                  '0.1'  , rep('', 8),
+                                  '1'    , rep('', 8),
+                                 '10'    , rep('', 8),
+                                '100'    , rep('', 8),
+                               '1000')) %>%
+  filter(breaks > ranges$amin & breaks < ranges$amax)
+
+xrange <- range(log10(lin_sum$theo_con))
+yrange <- range(log10(lin_sum$xbar), na.rm = TRUE) 
 
 figures$linearity_OvE_concentration <- 
-  map(unique(lin_sum$Assay), ~ filter(lin_sum, delta < 50 & rsd < 30 & Assay == .x) %>%
+  map(unique(lin_sum$Assay), ~ filter(lin_sum, delta < 50 & rsd < 30 &
+                                      !is.na(xbar) & theo_con > 0 &
+                                      Assay == .x) %>%
         ggplot(aes(theo_con, xbar)) +
         
         # plot points on log10 scale
-        geom_point() +
-        scale_x_log10() +
-        scale_y_log10() +
-        
-        # add spread for each mean
-        geom_errorbar(aes(ymin = min_acon, ymax = max_acon), width = 0) +
+        scale_x_log10(limits = c(ranges$amin, ranges$amax), 
+                      breaks = axis_labs$breaks, labels = axis_labs$labels) +
+        scale_y_log10(limits = c(ranges$amin, ranges$amax), 
+                      breaks = axis_labs$breaks, labels = axis_labs$labels) +
         
         # add trend line
         geom_smooth(method = 'lm', se = FALSE, formula = y ~ x) +
         geom_abline(slope = 1, intercept = 0) +
+
+        # layer data on top
+        geom_point(color = 'blue') +
+        
+        # add spread for each mean
+        geom_errorbar(aes(ymin = min_acon, ymax = max_acon), width = 0, color = 'blue') +
         
         # labels
         annotate('text', x = 0, y = Inf, 
                  label = paste(' slope =', round(filter(lin_assay_sum, Assay == .x)$slope, 2)),
                  hjust = 0, vjust = 1) +
-        ylab('Titer (AU/mL)') +
-        xlab('Theoretical Concentration') +
-        ggtitle(.x))
+        ylab('Measured Concentration (AU/mL)') +
+        xlab('Expected Concentration (AU/mL)') +
+        ggtitle(full_assay_name[.x]))
 
 names(figures$linearity_OvE_concentration) <- unique(lin_sum$Assay)
 
@@ -329,7 +380,6 @@ figures$linearity_OvE_concentration_bad <-
         ggplot(aes(theo_con, xbar, color = delta < 50 & rsd < 30)) +
         
         # plot points on log10 scale
-        geom_point() +
         scale_x_log10() +
         scale_y_log10(labels = scales::comma) +
         
@@ -340,7 +390,10 @@ figures$linearity_OvE_concentration_bad <-
         # add cutoff lines
         # geom_vline(xintercept = filter(lloq_thresh, Assay == .x)$lloq, linetype = 2) +
         # geom_vline(xintercept = filter(uloq_thresh, Assay == .x)$uloq, linetype = 2) +
-        
+
+        # layer data on top
+        geom_point() +
+                
         # labels
         ylab('Titer (AU/mL)') +
         xlab('Theoretical Concentration') +
@@ -348,11 +401,13 @@ figures$linearity_OvE_concentration_bad <-
 
 names(figures$linearity_OvE_concentration_bad) <- unique(lin_sum$Assay)
 
-# ggplot(lin, aes(MFI, acon)) +
-#   geom_point() +
-#   scale_x_log10() +
-#   scale_y_log10() +
-#   geom_smooth(method = 'lm', se = TRUE)
+#### save pdf figures ####
+for(i in 1:length(figures$linearity_OvE_concentration))
+{
+  save_plot(paste0(root, '/figs/', names(figures$linearity_OvE_concentration)[i], '.pdf'),
+            figures$linearity_OvE_concentration[[i]],
+            base_asp = 1)
+}
 
 ##### final table #####
 # calculate linearity summaries by Assay, Sample_ID
