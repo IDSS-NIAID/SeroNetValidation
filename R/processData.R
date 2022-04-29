@@ -1,33 +1,29 @@
 # processData.R
-# should be called from SPIKEanalysis.Rmd
+# should be called from report.Rmd
 
-base_rsd_pct <- 25
+# pct error
 base_pct_error <- 30
-
-lloq_rsd_pct <- base_rsd_pct
-lloq_pct_error <- base_pct_error
-
-uloq_rsd_pct <- base_rsd_pct
-uloq_pct_error <- base_pct_error
-
-lin_rsd_pct <- 30
+lloq_pct_error <- 50
+uloq_pct_error <- 50
 lin_pct_error <- 50
-
-cutpt_bound <- 0.975
-
-sens_rsd_pct <- base_rsd_pct
 sens_pct_error <- 50
-
 acc_pct_error <- 20
+stab_pct_error <- 20
 
+# rsd pct
+base_rsd_pct <- 25
+lloq_rsd_pct <- base_rsd_pct
+uloq_rsd_pct <- base_rsd_pct
+lin_rsd_pct <- 30
+sens_rsd_pct <- base_rsd_pct
 prec_rsd_pct <- 25
+covr_rsd_pct <- 20
 
+# other constants
+cutpt_bound <- 0.975
 spec_inhibit <- 90
 spec_non_inhibit <- 25
 
-covr_rsd_pct <- 20
-
-stab_pct_error <- 20
 
 ########
 # LLOQ #
@@ -474,6 +470,26 @@ tables$sens2 <- filter(sens2_sum, delta <= sens_pct_error & rsd <= sens_rsd_pct)
             `CV%` = rsd[which.max(theo_con)],
             `Concentration (AU/mL)` = xbar[which.max(theo_con)]) %>%
   ungroup()
+
+# debugging
+if(FALSE)
+{
+  sens2_sum %>%
+    filter(delta <= sens_pct_error & rsd <= sens_rsd_pct) %>% # this is the step where we loose everything
+    group_by(Sample_ID) %>%
+    summarize(max(xbar))
+  
+  sens2 %>%
+    #filter(Sample_ID == 'RDP0977_C1') %>%
+    #mutate(qc = ifelse(delta <= sens_pct_error & rsd <= sens_rsd_pct, 'keep', 'filter')) %>%
+    ggplot(aes(Dil_Factor, acon))+#, color = qc)) +
+    geom_point() +
+    geom_abline(intercept = 0, slope = 1) +
+    scale_x_log10() +
+    scale_y_log10() +
+    geom_smooth(method = 'lm') +
+    facet_wrap(~ Sample_ID)
+}
 
 
 ##########################
@@ -947,16 +963,18 @@ tables$l2l <- filter(conj_sum, delta > 0) %>%
     group_by(Assay) %>%
     summarize(`Conjugate Passing` = sum(delta <= stab_pct_error),
               `Conjugate Total` = length(delta),
-              `Conjugate w/ Error ≤ 25%` = paste0(round(`Conjugate Passing` / `Conjugate Total`, 3) * 100, "%")) %>%
+              fixme = paste0(round(`Conjugate Passing` / `Conjugate Total`, 3) * 100, "%")) %>%
     ungroup()
+names(tables$l2l)[names(tables$l2l) == 'fixme'] <- paste0('Conjugate w/ Error ≤ ', stab_pct_error, '%')
 
 tables$l2l <- filter(antigen_sum, delta > 0) %>%
     group_by(Assay) %>%
     summarize(`Antigen Passing` = sum(delta <= stab_pct_error),
               `Antigen Total` = length(delta),
-              `Antigen w/ Error ≤ 25%` = paste0(round(`Antigen Passing` / `Antigen Total`, 3) * 100, "%")) %>%
+              fixme = paste0(round(`Antigen Passing` / `Antigen Total`, 3) * 100, "%")) %>%
     ungroup() %>%
     right_join(tables$l2l, by = 'Assay')
+names(tables$l2l)[names(tables$l2l) == 'fixme'] <- paste0('Antigen w/ Error ≤ ', stab_pct_error, '%')
 
 
 #######################
