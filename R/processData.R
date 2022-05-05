@@ -482,12 +482,14 @@ if(FALSE)
   sens2 %>%
     #filter(Sample_ID == 'RDP0977_C1') %>%
     #mutate(qc = ifelse(delta <= sens_pct_error & rsd <= sens_rsd_pct, 'keep', 'filter')) %>%
-    ggplot(aes(Dil_Factor, acon))+#, color = qc)) +
+    mutate(Day = as.factor(Day)) %>%
+    ggplot(aes(Dil_Factor, acon, color = Day)) +
     geom_point() +
     geom_abline(intercept = 0, slope = 1) +
     scale_x_log10() +
     scale_y_log10() +
-    geom_smooth(method = 'lm') +
+    #geom_smooth(method = 'lm') +
+    scale_color_manual(values = 1:6) +
     facet_wrap(~ Sample_ID)
 }
 

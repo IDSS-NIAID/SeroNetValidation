@@ -31,7 +31,7 @@ source(paste0(root, '/R/helper functions.R'))
 
 # input file
 # https://abcs-amp.cancer.gov/uploads/external/316/cd64051437525a8347b21bd37af151656ace9db6
-f <- paste0(root, '/data/HSL_VAL_HPV18VLP_Summary_V3.1.xlsx')
+f <- paste0(root, '/data/HSL_VAL_HPV18VLP_Summary_V4.xlsx')
 
 # pre-validation results to use for accuracy
 # not used
